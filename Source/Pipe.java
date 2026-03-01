@@ -4,36 +4,45 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Pipe (Client Thread)
  *
  * Spawned by DoormanListener for every incoming client connection.
  * Lifecycle:
- *   1. Read the service request header from the client.
- *      Expected format (plain text, UTF-8, newline-terminated):
- *        "<clientId>,<serviceName>\n"
+ *   1. Read the full JSON payload from the client.
+ *      Expected format:
+ *        { "service": <1-5>, "filename": "...", "base64": "..." }
  *
- *   2. Send the client the current list of available services so they
- *      can confirm the service is live before sending data.
- *      Format: comma-separated service names, newline-terminated.
+ *   2. Extract the service number and map it to a Service enum value.
  *
- *   3. Wait for the client to send its raw payload (all remaining bytes
- *      until the client closes its output / sends EOF).
+ *   3. Send the client the current list of available services.
  *
  *   4. Look up a live Service Node for the requested service.
  *      If none found, reply with an error message and close.
  *
- *   5. Open a TCP connection to the Service Node, forward the payload,
- *      close the write side, then stream the result back to the client.
+ *   5. Forward the full JSON payload to the Service Node and stream
+ *      the result back to the client.
  *
  *   6. Close both sockets.
+ *
+ * Service number mapping:
+ *   1 -> N_BODY_GRAVITATIONAL_STEPPER
+ *   2 -> YARA_LITE_PATTERN_SCANNER
+ *   3 -> COMPRESSION_DECOMPRESSION
+ *   4 -> CSV_STATS
+ *   5 -> TBD
  */
 public class Pipe implements Runnable {
 
-    private final Socket        clientSocket;
-    private final int           clientId;
-    private final NodeRegistry  registry;
+    private static final Pattern SERVICE_PATTERN =
+            Pattern.compile("\"service\"\\s*:\\s*(\\d+)");
+
+    private final Socket       clientSocket;
+    private final int          clientId;
+    private final NodeRegistry registry;
 
     public Pipe(Socket clientSocket, int clientId, NodeRegistry registry) {
         this.clientSocket = clientSocket;
@@ -51,46 +60,43 @@ public class Pipe implements Runnable {
             OutputStream clientOut = cs.getOutputStream();
 
             // ---------------------------------------------------------- //
-            // Step 1 — read the request header line                       //
+            // Step 1 — read the full JSON payload from the client         //
+            // Expected format:                                             //
+            //   { "service": <1-5>, "filename": "...", "base64": "..." }  //
+            // Client ID is assigned by the server on connection.          //
             // ---------------------------------------------------------- //
-            String header = readLine(clientIn);
-            if (header == null || header.isEmpty()) {
+            byte[] payload = clientIn.readAllBytes();
+            if (payload.length == 0) {
                 sendError(clientOut, "Empty request.");
                 return;
             }
 
-            String[] parts = header.split(",", 2);
-            if (parts.length < 2) {
-                sendError(clientOut, "Malformed header. Expected: <clientId>,<serviceName>");
-                return;
-            }
-
-            // The client ID in the header should match what the server assigned.
-            // We log a warning if they differ but continue anyway.
-            int     claimedId = parseIntSafe(parts[0].trim());
-            Service requested = Service.fromString(parts[1].trim());
-
-            if (claimedId != clientId) {
-                System.err.printf("[Pipe-%d] WARNING: client claims id=%d%n", clientId, claimedId);
-            }
-            if (requested == null) {
-                sendError(clientOut, "Unknown service: " + parts[1].trim());
-                return;
-            }
+            String json = new String(payload);
 
             // ---------------------------------------------------------- //
-            // Step 2 — send available services back to the client         //
+            // Step 2 — extract service number and map to Service enum     //
+            // ---------------------------------------------------------- //
+            int serviceNum = extractServiceNumber(json);
+            if (serviceNum < 1) {
+                sendError(clientOut, "Could not parse service number from JSON.");
+                return;
+            }
+
+            Service requested = serviceFromNumber(serviceNum);
+            if (requested == null) {
+                sendError(clientOut, "Unknown service number: " + serviceNum);
+                return;
+            }
+
+            System.out.printf("[Pipe-%d] Routing service number %d -> %s%n",
+                    clientId, serviceNum, requested);
+
+            // ---------------------------------------------------------- //
+            // Step 3 — send available services back to the client         //
             // ---------------------------------------------------------- //
             String availableServices = buildServiceList();
             clientOut.write((availableServices + "\n").getBytes());
             clientOut.flush();
-
-            // ---------------------------------------------------------- //
-            // Step 3 — read the raw payload from the client               //
-            // ---------------------------------------------------------- //
-            byte[] payload = clientIn.readAllBytes(); // blocks until client closes write-half
-            System.out.printf("[Pipe-%d] Received %d bytes payload for service %s%n",
-                    clientId, payload.length, requested);
 
             // ---------------------------------------------------------- //
             // Step 4 — find a live node for the requested service         //
@@ -102,7 +108,7 @@ public class Pipe implements Runnable {
             }
 
             // ---------------------------------------------------------- //
-            // Step 5 — forward payload to SN and stream result back       //
+            // Step 5 — forward full JSON payload to SN, stream result back//
             // ---------------------------------------------------------- //
             forwardToNode(targetNode, payload, clientOut);
 
@@ -114,13 +120,42 @@ public class Pipe implements Runnable {
     }
 
     // ------------------------------------------------------------------ //
+    //  Service number -> enum mapping                                     //
+    //  Must stay in sync with whatever numbering Reed uses on the client  //
+    // ------------------------------------------------------------------ //
+
+    private Service serviceFromNumber(int n) {
+        return switch (n) {
+            case 1 -> Service.N_BODY_GRAVITATIONAL_STEPPER;
+            case 2 -> Service.BASE64_ENCODE_DECODE;
+            case 3 -> Service.COMPRESSION_DECOMPRESSION;
+            case 4 -> Service.CSV_STATS;
+            case 5 -> Service.IMAGE_TO_ASCII;
+            default -> null;
+        };
+    }
+
+    // ------------------------------------------------------------------ //
     //  Helpers                                                            //
     // ------------------------------------------------------------------ //
 
     /**
-     * Opens a TCP connection to the Service Node, sends the payload,
-     * signals EOF on the write side, then copies all response bytes back
-     * to the client.
+     * Extracts the integer value of the "service" field from the JSON blob
+     * using a simple regex — no external library needed for this one field.
+     * Returns -1 if not found or unparseable.
+     */
+    private int extractServiceNumber(String json) {
+        Matcher m = SERVICE_PATTERN.matcher(json);
+        if (m.find()) {
+            try { return Integer.parseInt(m.group(1)); }
+            catch (NumberFormatException e) { return -1; }
+        }
+        return -1;
+    }
+
+    /**
+     * Opens a TCP connection to the Service Node, sends the full JSON payload,
+     * signals EOF, then copies all response bytes back to the client.
      */
     private void forwardToNode(NodeInfo node, byte[] payload, OutputStream clientOut)
             throws IOException {
@@ -132,12 +167,10 @@ public class Pipe implements Runnable {
             OutputStream nodeOut = nodeSocket.getOutputStream();
             InputStream  nodeIn  = nodeSocket.getInputStream();
 
-            // Send the payload to the SN.
             nodeOut.write(payload);
             nodeOut.flush();
             nodeSocket.shutdownOutput(); // signal EOF to SN
 
-            // Stream the result back to the client.
             byte[] result = nodeIn.readAllBytes();
             clientOut.write(result);
             clientOut.flush();
@@ -145,17 +178,6 @@ public class Pipe implements Runnable {
             System.out.printf("[Pipe-%d] Forwarded %d result bytes back to client.%n",
                     clientId, result.length);
         }
-    }
-
-    /** Reads bytes until '\n' or stream end. Returns null on immediate EOF. */
-    private String readLine(InputStream in) throws IOException {
-        StringBuilder sb = new StringBuilder();
-        int b;
-        while ((b = in.read()) != -1) {
-            if (b == '\n') break;
-            if (b != '\r') sb.append((char) b);
-        }
-        return sb.length() == 0 && b == -1 ? null : sb.toString();
     }
 
     private void sendError(OutputStream out, String message) throws IOException {
@@ -174,10 +196,5 @@ public class Pipe implements Runnable {
             sb.deleteCharAt(sb.length() - 1);
         }
         return sb.toString();
-    }
-
-    private int parseIntSafe(String s) {
-        try { return Integer.parseInt(s); }
-        catch (NumberFormatException e) { return -1; }
     }
 }
