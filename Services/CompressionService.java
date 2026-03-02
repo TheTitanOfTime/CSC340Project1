@@ -1,4 +1,4 @@
-package CSC340Project1.Services;
+package Services;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
