@@ -33,8 +33,16 @@ public class Server {
         doormanThread.start();
         System.out.println("[Server] DoormanListener started.");
 
+        // --- HTTPGateway (browser-facing REST bridge) --------------------
+        HTTPGateway httpGateway = new HTTPGateway();
+        Thread gatewayThread = new Thread(httpGateway, "HTTPGateway");
+        gatewayThread.setDaemon(true);   // daemon: exits with the JVM
+        gatewayThread.start();
+        System.out.println("[Server] HTTPGateway started on HTTP port " + HTTPGateway.HTTP_PORT + ".");
+
         System.out.println("[Server] Ready. Listening on TCP:" + DoormanListener.TCP_PORT
-                + " and UDP:" + HeartbeatMonitor.UDP_PORT);
+                + "  UDP:" + HeartbeatMonitor.UDP_PORT
+                + "  HTTP:" + HTTPGateway.HTTP_PORT);
 
         // The main thread has nothing left to do — the two worker threads
         // keep the JVM alive until the process is killed.
