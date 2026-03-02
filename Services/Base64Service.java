@@ -41,5 +41,15 @@ public class Base64Service {
 
         String decodeTest1 = "QW5k";
         System.out.println(decodeToString(decodeTest1));
+
+        byte[] input = "Base64 Test".getBytes(StandardCharsets.UTF_8);
+
+        byte[] encoded = encode(input);
+        System.out.println(new String(encoded, StandardCharsets.US_ASCII));
+        // expected: QmFzZTY0IFRlc3Q=
+
+        byte[] decoded = decode(encoded);
+        System.out.println(new String(decoded, StandardCharsets.UTF_8));
+        // expected: Base64 Test
     }
 }
