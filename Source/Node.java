@@ -51,8 +51,13 @@ public abstract class Node implements Runnable {
     /** How often (ms) this node sends a UDP heartbeat to the server. */
     private static final int HEARTBEAT_INTERVAL_MS = 5_000;
 
-    /** Server host where HeartbeatMonitor is listening. */
-    private static final String SERVER_HOST = "localhost";
+    /**
+     * Server host where HeartbeatMonitor is listening.
+     * Defaults to "localhost" for single-machine dev.
+     * Override at launch: java -Dserver.host=<IP> Services.NBody.NBodyNode
+     */
+    private static final String SERVER_HOST =
+            System.getProperty("server.host", "localhost");
 
     /** Must match HeartbeatMonitor.UDP_PORT. */
     private static final int HEARTBEAT_UDP_PORT = 6001;
