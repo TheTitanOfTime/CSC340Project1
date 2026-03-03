@@ -6,6 +6,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.concurrent.Executors;
 
 /**
@@ -35,8 +36,16 @@ public class HTTPGateway implements Runnable {
 
     public static final int HTTP_PORT = 5050;
 
-    private static final String DOORMAN_HOST = "127.0.0.1";
-    private static final int    DOORMAN_PORT = DoormanListener.TCP_PORT;
+    private static final String DOORMAN_HOST  = "127.0.0.1";
+    private static final int    DOORMAN_PORT  = DoormanListener.TCP_PORT;
+
+    /**
+     * Root directory for static frontend files.
+     * Default works when the server is launched from the project root.
+     * Override on AWS: -Dfrontend.dir=/home/ec2-user/Frontend
+     */
+    private static final String FRONTEND_DIR =
+            System.getProperty("frontend.dir", "Frontend");
 
     // -----------------------------------------------------------------------
     // Runnable entry point
@@ -49,9 +58,12 @@ public class HTTPGateway implements Runnable {
                     new InetSocketAddress(HTTP_PORT), /* backlog */ 32);
             server.createContext("/ping",      this::handlePing);
             server.createContext("/api/nbody", this::handleNBody);
+            server.createContext("/",          this::handleStatic);
             server.setExecutor(Executors.newCachedThreadPool());
             server.start();
             System.out.printf("[HTTPGateway] HTTP server listening on port %d%n", HTTP_PORT);
+            System.out.printf("[HTTPGateway] Serving frontend from: %s%n",
+                    new File(FRONTEND_DIR).getCanonicalPath());
         } catch (IOException e) {
             System.err.printf("[HTTPGateway] Failed to start: %s%n", e.getMessage());
         }
@@ -114,6 +126,59 @@ public class HTTPGateway implements Runnable {
         } catch (IOException e) {
             sendError(ex, "Could not reach DoormanListener: " + e.getMessage());
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // GET /* — static frontend files
+    // -----------------------------------------------------------------------
+
+    /**
+     * Serves static files from FRONTEND_DIR.
+     *   /                        → Frontend/src/index.html
+     *   /src/Gravitational.html  → Frontend/src/Gravitational.html
+     *   /Resources/images/x.png  → Frontend/Resources/images/x.png
+     *
+     * Path traversal is blocked by canonical-path check.
+     */
+    private void handleStatic(HttpExchange ex) throws IOException {
+        String uriPath = ex.getRequestURI().getPath();
+
+        if (uriPath.equals("/")) uriPath = "/src/index.html";
+
+        File root = new File(FRONTEND_DIR).getCanonicalFile();
+        File file = new File(root, uriPath).getCanonicalFile();
+
+        // Security: block any path that escapes the frontend root
+        if (!file.getPath().startsWith(root.getPath())) {
+            send404(ex); return;
+        }
+
+        if (!file.exists() || !file.isFile()) {
+            send404(ex); return;
+        }
+
+        byte[] body = Files.readAllBytes(file.toPath());
+        ex.getResponseHeaders().set("Content-Type", mimeType(file.getName()));
+        ex.sendResponseHeaders(200, body.length);
+        try (OutputStream os = ex.getResponseBody()) { os.write(body); }
+    }
+
+    private static String mimeType(String name) {
+        if (name.endsWith(".html")) return "text/html; charset=utf-8";
+        if (name.endsWith(".css"))  return "text/css; charset=utf-8";
+        if (name.endsWith(".js"))   return "application/javascript";
+        if (name.endsWith(".png"))  return "image/png";
+        if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
+        if (name.endsWith(".ico"))  return "image/x-icon";
+        if (name.endsWith(".json")) return "application/json";
+        return "application/octet-stream";
+    }
+
+    private static void send404(HttpExchange ex) throws IOException {
+        byte[] body = "404 Not Found".getBytes(StandardCharsets.UTF_8);
+        ex.getResponseHeaders().set("Content-Type", "text/plain");
+        ex.sendResponseHeaders(404, body.length);
+        try (OutputStream os = ex.getResponseBody()) { os.write(body); }
     }
 
     // -----------------------------------------------------------------------
