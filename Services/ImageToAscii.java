@@ -3,13 +3,29 @@ package Services;
 import java.awt.image.BufferedImage;
 import java.awt.Color;
 import java.awt.Graphics2D;
+import java.nio.charset.StandardCharsets;
+
 
 public class ImageToAscii {
 //#%=+-*. 42.5
     private final int VERTICAL_SCALAR = 48;
     private final int HORIZONTAL_SCALAR = 176;
 
-    public BufferedImage grayscale_conversion(BufferedImage image){
+    public byte[] convert_to_ascii(BufferedImage image){
+        String txtFile = "";   
+
+        image = grayscale_conversion(image);
+        image = resize(image);
+
+        txtFile = convert(image);
+        byte[] fileBytes = txtFile.getBytes(StandardCharsets.UTF_8);
+
+        return fileBytes;
+    }
+
+
+
+    private BufferedImage grayscale_conversion(BufferedImage image){
         for(int j = 0; j < image.getWidth(); j++){
             for(int k = 0; k < image.getHeight(); k++){
                 int rgb = image.getRGB(j, k);
@@ -26,7 +42,7 @@ public class ImageToAscii {
         return image;
     }
       
-    public BufferedImage resize(BufferedImage image){
+    private BufferedImage resize(BufferedImage image){
         double vertical_scale = image.getHeight() / VERTICAL_SCALAR;
         double horizontal_scale = image.getWidth() / HORIZONTAL_SCALAR;
 
@@ -39,7 +55,7 @@ public class ImageToAscii {
         return resizedImage;
     }
 
-    public String convert_to_ascii(BufferedImage image){
+    private String convert(BufferedImage image){
         String output = "";
         for(int j = 0; j < image.getHeight(); j ++){
             for(int i = 0; i < image.getWidth(); i++){
