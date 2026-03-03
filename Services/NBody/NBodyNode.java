@@ -49,7 +49,7 @@ public class NBodyNode extends Node {
     // -----------------------------------------------------------------------
 
     /**
-     * Delegates to NBodyExecutor.process(), which parses the JSON payload,
+     * Delegaes to NBodyExecutor.process(), which parses the JSON payload,
      * runs the N-body simulation, and returns a JSON result string.
      * Never throws — all errors are captured inside the returned JSON.
      */
@@ -61,7 +61,7 @@ public class NBodyNode extends Node {
     }
 
     // -----------------------------------------------------------------------
-    // Entry point
+    //Entry point
     // -----------------------------------------------------------------------
 
     public static void main(String[] args) {

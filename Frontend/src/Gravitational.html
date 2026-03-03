@@ -335,10 +335,9 @@
   import { CSS2DRenderer, CSS2DObject }   from 'three/addons/renderers/CSS2DRenderer.js';
 
   // ── Config ────────────────────────────────────────────────────────────────
-  // Local dev:  'http://localhost:5050'
-  // AWS deploy: 'http://<SERVER-EC2-PUBLIC-IP>:5050'
-  // const GATEWAY = 'http://localhost:5050';
- const GATEWAY = 'http://54.225.145.40:5050'
+  // Relative URL works whether the page is served locally or from AWS.
+  // The browser automatically sends requests to whatever host served the page.
+  const GATEWAY = '';
 
   const PALETTE = [
     0xFFD700, 0x4FC3F7, 0xFF7043, 0xAB47BC, 0x66BB6A,
@@ -622,7 +621,7 @@
       const d = await r.json();
       if (d.status === 'alive') {
         dot.className   = 'alive';
-        txt.textContent = 'Server online — localhost:5050';
+        txt.textContent = 'Server online';
         return;
       }
     } catch { /* fall through */ }
