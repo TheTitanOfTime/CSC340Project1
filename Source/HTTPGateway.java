@@ -56,9 +56,10 @@ public class HTTPGateway implements Runnable {
         try {
             HttpServer server = HttpServer.create(
                     new InetSocketAddress(HTTP_PORT), /* backlog */ 32);
-            server.createContext("/ping",      this::handlePing);
-            server.createContext("/api/nbody", this::handleNBody);
-            server.createContext("/",          this::handleStatic);
+            server.createContext("/ping",         this::handlePing);
+            server.createContext("/api/nbody",    this::handleNBody);
+            server.createContext("/api/compress", this::handleCompress);
+            server.createContext("/",             this::handleStatic);
             server.setExecutor(Executors.newCachedThreadPool());
             server.start();
             System.out.printf("[HTTPGateway] HTTP server listening on port %d%n", HTTP_PORT);
@@ -117,6 +118,47 @@ public class HTTPGateway implements Runnable {
             readLine(in);
 
             // Step 5: read the service result
+            byte[] result = in.readAllBytes();
+
+            ex.getResponseHeaders().set("Content-Type", "application/json");
+            ex.sendResponseHeaders(200, result.length);
+            try (OutputStream os = ex.getResponseBody()) { os.write(result); }
+
+        } catch (IOException e) {
+            sendError(ex, "Could not reach DoormanListener: " + e.getMessage());
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // POST /api/compress
+    // -----------------------------------------------------------------------
+
+    private void handleCompress(HttpExchange ex) throws IOException {
+        addCors(ex);
+
+        if ("OPTIONS".equalsIgnoreCase(ex.getRequestMethod())) {
+            ex.sendResponseHeaders(204, -1);
+            return;
+        }
+
+        byte[] payload = ex.getRequestBody().readAllBytes();
+        if (payload.length == 0) {
+            sendError(ex, "Empty request body.");
+            return;
+        }
+
+        try (Socket socket = new Socket(DOORMAN_HOST, DOORMAN_PORT)) {
+
+            OutputStream out = socket.getOutputStream();
+            out.write(payload);
+            out.flush();
+
+            socket.shutdownOutput();
+
+            InputStream in = socket.getInputStream();
+
+            readLine(in);
+
             byte[] result = in.readAllBytes();
 
             ex.getResponseHeaders().set("Content-Type", "application/json");
