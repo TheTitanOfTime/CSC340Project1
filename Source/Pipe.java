@@ -110,7 +110,14 @@ public class Pipe implements Runnable {
             // ---------------------------------------------------------- //
             // Step 5 — forward full JSON payload to SN, stream result back//
             // ---------------------------------------------------------- //
-            forwardToNode(targetNode, payload, clientOut);
+            try {
+                forwardToNode(targetNode, payload, clientOut);
+            } catch (IOException e) {
+                System.err.printf("[Pipe-%d] forwardToNode error: %s%n", clientId, e.getMessage());
+                String msg = e.getMessage() != null ? e.getMessage().replace("\"", "'") : "Node unreachable";
+                clientOut.write(("{\"status\":\"error\",\"message\":\"" + msg + "\"}").getBytes());
+                clientOut.flush();
+            }
 
         } catch (IOException e) {
             System.err.printf("[Pipe-%d] IO error: %s%n", clientId, e.getMessage());
