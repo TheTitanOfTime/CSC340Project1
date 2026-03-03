@@ -84,3 +84,8 @@ body{
     margin-top: 50px;
 }
 
+label.drag-over {
+    border-color: #9966cc;
+    background: rgba(153, 102, 204, 0.15);
+    transform: scale(1.02);
+}
