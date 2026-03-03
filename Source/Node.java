@@ -217,7 +217,14 @@ public abstract class Node implements Runnable {
                 return;
             }
 
-            byte[] result = handleRequest(payload);
+            byte[] result;
+            try {
+                result = handleRequest(payload);
+            } catch (Throwable e) {
+                System.err.printf("[%s] dispatchRequest error: %s%n", getService(), e.getMessage());
+                String msg = e.getMessage() != null ? e.getMessage().replace("\"", "'") : e.getClass().getSimpleName();
+                result = ("{\"status\":\"error\",\"message\":\"" + msg + "\"}").getBytes();
+            }
 
             ps.getOutputStream().write(result);
             ps.getOutputStream().flush();

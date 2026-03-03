@@ -40,10 +40,6 @@ public class CompressionNode extends Node {
 
     private static final Pattern OPERATION_PATTERN =
             Pattern.compile("\"operation\"\\s*:\\s*\"([^\"]+)\"");
-    private static final Pattern FILENAME_PATTERN =
-            Pattern.compile("\"filename\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
-    private static final Pattern DATA_PATTERN =
-            Pattern.compile("\"data\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
 
     private static final Base64.Decoder DECODER = Base64.getDecoder();
     private static final Base64.Encoder ENCODER = Base64.getEncoder();
@@ -69,8 +65,8 @@ public class CompressionNode extends Node {
         String json = new String(payload, StandardCharsets.UTF_8);
 
         String operation = extract(OPERATION_PATTERN, json);
-        String filename  = extract(FILENAME_PATTERN,  json);
-        String data      = extract(DATA_PATTERN,      json);
+        String filename  = extractJsonString(json, "filename");
+        String data      = extractJsonString(json, "data");
 
         if (operation == null || operation.isBlank()) {
             return error("Missing \"operation\" field. Expected \"compress\" or \"decompress\".");
@@ -118,6 +114,21 @@ public class CompressionNode extends Node {
     private static String extract(Pattern p, String json) {
         Matcher m = p.matcher(json);
         return m.find() ? m.group(1) : null;
+    }
+
+    private static String extractJsonString(String json, String key) {
+        String needle = "\"" + key + "\":\"";
+        int pos = json.indexOf(needle);
+        if (pos < 0) return null;
+        pos += needle.length();
+        StringBuilder sb = new StringBuilder();
+        while (pos < json.length()) {
+            char c = json.charAt(pos++);
+            if (c == '"') return sb.toString();
+            if (c == '\\' && pos < json.length()) c = json.charAt(pos++);
+            sb.append(c);
+        }
+        return null;
     }
 
     private static byte[] success(String resultBase64, String filename) {
