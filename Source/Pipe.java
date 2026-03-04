@@ -43,11 +43,13 @@ public class Pipe implements Runnable {
     private final Socket       clientSocket;
     private final int          clientId;
     private final NodeRegistry registry;
+    private final Runnable     releaseId;
 
-    public Pipe(Socket clientSocket, int clientId, NodeRegistry registry) {
+    public Pipe(Socket clientSocket, int clientId, NodeRegistry registry, Runnable releaseId) {
         this.clientSocket = clientSocket;
         this.clientId     = clientId;
         this.registry     = registry;
+        this.releaseId    = releaseId;
     }
 
     @Override
@@ -124,6 +126,7 @@ public class Pipe implements Runnable {
         }
 
         System.out.printf("[Pipe-%d] Done.%n", clientId);
+        releaseId.run();
     }
 
     // ------------------------------------------------------------------ //
