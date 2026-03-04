@@ -1,6 +1,5 @@
 package Services.Compression;
 
-import Services.CompressionService;
 import Source.Node;
 import Source.Service;
 
