@@ -10,14 +10,14 @@ import java.util.zip.ZipOutputStream;
 public class CompressionService {
     private static final int BUFFER_SIZE = 8192; // default size for buffering 8 kb
 
-    public byte[] compress(byte[] input) throws IOException {
+    public byte[] compress(byte[] input, String entryName) throws IOException {
         if(input == null){
             throw new IllegalArgumentException("There has to be a input");
         }
 
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(output)) {
-            zip.putNextEntry(new ZipEntry("data"));
+            zip.putNextEntry(new ZipEntry(entryName));
             zip.write(input);
             zip.closeEntry();
         }
