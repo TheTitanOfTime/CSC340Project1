@@ -1,4 +1,4 @@
-package Services;
+package Services.Compression;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;

@@ -3,7 +3,7 @@ package Source;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
-import Services.CompressionService;
+import Services.Compression.CompressionService;
 
 import java.io.*;
 import java.net.*;
