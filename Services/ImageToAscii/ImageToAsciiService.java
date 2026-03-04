@@ -17,15 +17,15 @@ public class ImageToAsciiService {
     public static byte[] convert_to_ascii(byte[] bytes){
         BufferedImage image = btyes_to_bufferedImage(bytes);
         
-        String txtFile = "";   
+        String txt_file = "";   
 
         image = grayscale_conversion(image);
         image = resize(image);
 
-        txtFile = convert(image);
-        byte[] fileBytes = txtFile.getBytes(StandardCharsets.UTF_8);
+        txt_file = convert(image);
+        byte[] file_bytes = txt_file.getBytes(StandardCharsets.UTF_8);
 
-        return fileBytes;
+        return file_bytes;
     }
 
 
