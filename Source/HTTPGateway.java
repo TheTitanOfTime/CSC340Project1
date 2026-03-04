@@ -181,7 +181,13 @@ public class HTTPGateway implements Runnable {
     private void handleStatic(HttpExchange ex) throws IOException {
         String uriPath = ex.getRequestURI().getPath();
 
-        if (uriPath.equals("/")) uriPath = "/src/index.html";
+        // Map all page/asset requests into the src/ subdirectory.
+        // Resources (images, etc.) live under /Resources/ and are served as-is.
+        if (uriPath.equals("/")) {
+            uriPath = "/src/index.html";
+        } else if (!uriPath.startsWith("/Resources/")) {
+            uriPath = "/src" + uriPath;
+        }
 
         File root = new File(FRONTEND_DIR).getCanonicalFile();
         File file = new File(root, uriPath).getCanonicalFile();
