@@ -257,7 +257,11 @@ public class HTTPGateway implements Runnable {
     private void handleStatic(HttpExchange ex) throws IOException {
         String uriPath = ex.getRequestURI().getPath();
 
-        if (uriPath.equals("/")) uriPath = "/src/index.html";
+        if (uriPath.equals("/")) {
+            uriPath = "/src/index.html";
+        } else if (!uriPath.startsWith("/Resources/")) {
+            uriPath = "/src" + uriPath;
+        }
 
         File root = new File(FRONTEND_DIR).getCanonicalFile();
         File file = new File(root, uriPath).getCanonicalFile();
