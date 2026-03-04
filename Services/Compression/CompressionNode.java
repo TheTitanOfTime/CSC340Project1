@@ -87,7 +87,7 @@ public class CompressionNode extends Node {
         return switch (operation.trim().toLowerCase()) {
             case "compress" -> {
                 try {
-                    byte[] compressed = compressionService.compress(inputBytes);
+                    byte[] compressed = compressionService.compress(inputBytes, filename);
                     String outName = filename + ".zip";
                     yield success(ENCODER.encodeToString(compressed), outName);
                 } catch (IOException e) {
