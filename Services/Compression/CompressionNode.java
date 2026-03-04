@@ -28,8 +28,8 @@ import java.util.regex.Pattern;
  *   { "status": "error", "message": "<details>" }
  *
  * Filename convention:
- *   compress   → appends ".z"   (e.g. "notes.txt" → "notes.txt.z")
- *   decompress → strips ".z" if present (e.g. "notes.txt.z" → "notes.txt")
+ *   compress   → appends ".zip"   (e.g. "notes.txt" → "notes.txt.zip")
+ *   decompress → strips ".zip" if present (e.g. "notes.txt.zip" → "notes.txt")
  *
  * Directory: Services/Compression/CompressionNode.java
  */
@@ -86,15 +86,19 @@ public class CompressionNode extends Node {
 
         return switch (operation.trim().toLowerCase()) {
             case "compress" -> {
-                byte[] compressed = compressionService.compress(inputBytes);
-                String outName = filename + ".z";
-                yield success(ENCODER.encodeToString(compressed), outName);
+                try {
+                    byte[] compressed = compressionService.compress(inputBytes);
+                    String outName = filename + ".zip";
+                    yield success(ENCODER.encodeToString(compressed), outName);
+                } catch (IOException e) {
+                    yield error("Compression failed: " + e.getMessage());
+                }
             }
             case "decompress" -> {
                 try {
                     byte[] decompressed = compressionService.decompress(inputBytes);
-                    String outName = filename.endsWith(".z")
-                            ? filename.substring(0, filename.length() - 2)
+                    String outName = filename.endsWith(".zip")
+                            ? filename.substring(0, filename.length() - 4)
                             : filename + ".decompressed";
                     yield success(ENCODER.encodeToString(decompressed), outName);
                 } catch (IOException e) {

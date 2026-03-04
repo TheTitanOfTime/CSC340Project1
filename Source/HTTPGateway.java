@@ -3,11 +3,16 @@ package Source;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
+import Services.CompressionService;
+
 import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.Base64;
 import java.util.concurrent.Executors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * HTTPGateway — Lightweight HTTP bridge that lets browser frontends reach the
@@ -46,6 +51,12 @@ public class HTTPGateway implements Runnable {
      */
     private static final String FRONTEND_DIR =
             System.getProperty("frontend.dir", "Frontend");
+
+    // Compression handled in-process (no separate CompressionNode required)
+    private static final CompressionService COMPRESSION_SVC = new CompressionService();
+    private static final Base64.Decoder     B64_DEC = Base64.getDecoder();
+    private static final Base64.Encoder     B64_ENC = Base64.getEncoder();
+    private static final Pattern OP_PAT = Pattern.compile("\"operation\"\\s*:\\s*\"([^\"]+)\"");
 
     // -----------------------------------------------------------------------
     // Runnable entry point
@@ -147,23 +158,90 @@ public class HTTPGateway implements Runnable {
             return;
         }
 
-        try (Socket socket = new Socket(DOORMAN_HOST, DOORMAN_PORT)) {
-            OutputStream out = socket.getOutputStream();
-            out.write(payload);
-            out.flush();
-            socket.shutdownOutput();
+        String json      = new String(payload, StandardCharsets.UTF_8);
+        String operation = extractField(OP_PAT, json);
+        String filename  = extractJsonString(json, "filename");
+        String data      = extractJsonString(json, "data");
 
-            InputStream in = socket.getInputStream();
-            readLine(in); // skip AVAILABLE_SERVICES line
-            byte[] result = in.readAllBytes();
-
-            ex.getResponseHeaders().set("Content-Type", "application/json");
-            ex.sendResponseHeaders(200, result.length);
-            try (OutputStream os = ex.getResponseBody()) { os.write(result); }
-
-        } catch (IOException e) {
-            sendError(ex, "Could not reach DoormanListener: " + e.getMessage());
+        if (operation == null || operation.isBlank()) {
+            sendCompressError(ex, "Missing \"operation\" field.");
+            return;
         }
+        if (data == null) {
+            sendCompressError(ex, "Missing \"data\" field.");
+            return;
+        }
+        if (filename == null || filename.isBlank()) filename = "file";
+
+        byte[] inputBytes;
+        try {
+            inputBytes = B64_DEC.decode(data);
+        } catch (IllegalArgumentException e) {
+            sendCompressError(ex, "Invalid Base64 data: " + e.getMessage());
+            return;
+        }
+
+        try {
+            byte[] outputBytes;
+            String outName;
+            String op = operation.trim().toLowerCase();
+            if (op.equals("compress")) {
+                outputBytes = COMPRESSION_SVC.compress(inputBytes);
+                outName     = filename + ".zip";
+            } else if (op.equals("decompress")) {
+                outputBytes = COMPRESSION_SVC.decompress(inputBytes);
+                outName     = filename.endsWith(".zip")
+                        ? filename.substring(0, filename.length() - 4)
+                        : filename + ".decompressed";
+            } else {
+                sendCompressError(ex, "Unknown operation: " + operation);
+                return;
+            }
+
+            String encResult  = B64_ENC.encodeToString(outputBytes);
+            String escName    = outName.replace("\\", "\\\\").replace("\"", "\\\"");
+            String response   = "{\"status\":\"ok\",\"result\":\"" + encResult + "\",\"filename\":\"" + escName + "\"}";
+            byte[] body       = response.getBytes(StandardCharsets.UTF_8);
+            ex.getResponseHeaders().set("Content-Type", "application/json");
+            ex.sendResponseHeaders(200, body.length);
+            try (OutputStream os = ex.getResponseBody()) { os.write(body); }
+
+        } catch (Exception e) {
+            sendCompressError(ex, e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+        }
+    }
+
+    private void sendCompressError(HttpExchange ex, String message) throws IOException {
+        String esc  = message.replace("\\", "\\\\").replace("\"", "\\\"");
+        byte[] body = ("{\"status\":\"error\",\"message\":\"" + esc + "\"}").getBytes(StandardCharsets.UTF_8);
+        ex.getResponseHeaders().set("Content-Type", "application/json");
+        ex.sendResponseHeaders(200, body.length);
+        try (OutputStream os = ex.getResponseBody()) { os.write(body); }
+    }
+
+    private static String extractField(Pattern p, String json) {
+        Matcher m = p.matcher(json);
+        return m.find() ? m.group(1) : null;
+    }
+
+    /**
+     * Extracts the value of a JSON string field without regex, avoiding
+     * StackOverflowError that occurs when regex group quantifiers recurse
+     * over large values (e.g. base64-encoded file data).
+     */
+    private static String extractJsonString(String json, String key) {
+        String needle = "\"" + key + "\":\"";
+        int pos = json.indexOf(needle);
+        if (pos < 0) return null;
+        pos += needle.length();
+        StringBuilder sb = new StringBuilder();
+        while (pos < json.length()) {
+            char c = json.charAt(pos++);
+            if (c == '"') return sb.toString();
+            if (c == '\\' && pos < json.length()) c = json.charAt(pos++);
+            sb.append(c);
+        }
+        return null; // unterminated string
     }
 
     // -----------------------------------------------------------------------
@@ -181,13 +259,7 @@ public class HTTPGateway implements Runnable {
     private void handleStatic(HttpExchange ex) throws IOException {
         String uriPath = ex.getRequestURI().getPath();
 
-        // Map all page/asset requests into the src/ subdirectory.
-        // Resources (images, etc.) live under /Resources/ and are served as-is.
-        if (uriPath.equals("/")) {
-            uriPath = "/src/index.html";
-        } else if (!uriPath.startsWith("/Resources/")) {
-            uriPath = "/src" + uriPath;
-        }
+        if (uriPath.equals("/")) uriPath = "/src/index.html";
 
         File root = new File(FRONTEND_DIR).getCanonicalFile();
         File file = new File(root, uriPath).getCanonicalFile();
