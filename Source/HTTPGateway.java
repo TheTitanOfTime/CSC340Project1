@@ -1,10 +1,8 @@
 package Source;
 
+import Services.Compression.CompressionService;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
-
-import Services.CompressionService;
-
 import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
