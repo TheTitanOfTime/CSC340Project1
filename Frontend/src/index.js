@@ -24,6 +24,8 @@ window.onload = function() {
 
     document.getElementById("Upload_File").addEventListener('change', function() {
         const label = document.querySelector('label[for="Upload_File"]');
+        if (this.files[0]) updateLabelText(label, this.files[0].name);
+
         if (this.files[0]) {
             const file = this.files[0];
             if (serviceNum === 5 && !["image/png", "image/jpeg"].includes(file.type)) {
@@ -116,10 +118,14 @@ function sendToServer(data) {
         body: JSON.stringify(data),
     })
     .then(response => response.json())
-    .then(responseData => { console.log('Server response:', responseData); })
-    .catch(error => { console.error('Error sending file:', error); });
+    .then(responseData => {
+        console.log('Server response:', responseData);
+    })
+    .catch(error => {
+        console.error('Error sending file:', error);
+    });
 }
-
+    
 function showPreview(file) {
     const preview = document.getElementById("Image_Preview");
     if (!preview) return;
