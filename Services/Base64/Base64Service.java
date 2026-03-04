@@ -1,4 +1,4 @@
-package Services.Base64;
+package Services.CSVStats;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;

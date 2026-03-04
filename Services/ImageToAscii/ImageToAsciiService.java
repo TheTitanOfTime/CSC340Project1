@@ -1,17 +1,22 @@
-package Services;
+package Services.ImageToAscii;
 
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import javax.imageio.ImageIO;
 
 
-public class ImageToAscii {
+public class ImageToAsciiService {
 //#%=+-*. 42.5
-    private final int VERTICAL_SCALAR = 48;
-    private final int HORIZONTAL_SCALAR = 176;
+    private static final int VERTICAL_SCALAR = 48;
+    private static final int HORIZONTAL_SCALAR = 176;
 
-    public byte[] convert_to_ascii(BufferedImage image){
+    public static byte[] convert_to_ascii(byte[] bytes){
+        BufferedImage image = btyes_to_bufferedImage(bytes);
+        
         String txtFile = "";   
 
         image = grayscale_conversion(image);
@@ -25,7 +30,22 @@ public class ImageToAscii {
 
 
 
-    private BufferedImage grayscale_conversion(BufferedImage image){
+
+
+
+
+    private static BufferedImage btyes_to_bufferedImage(byte[] bytes){
+        byte[] imageBytes = Base64.getDecoder().decode(bytes);
+
+        try (ByteArrayInputStream bis = new ByteArrayInputStream(imageBytes)){
+            return ImageIO.read(bis);
+        } catch (Exception e) {
+            System.out.println(e);
+            return null;
+        }
+    }
+
+    private static BufferedImage grayscale_conversion(BufferedImage image){
         for(int j = 0; j < image.getWidth(); j++){
             for(int k = 0; k < image.getHeight(); k++){
                 int rgb = image.getRGB(j, k);
@@ -42,7 +62,7 @@ public class ImageToAscii {
         return image;
     }
       
-    private BufferedImage resize(BufferedImage image){
+    private static BufferedImage resize(BufferedImage image){
         double vertical_scale = image.getHeight() / VERTICAL_SCALAR;
         double horizontal_scale = image.getWidth() / HORIZONTAL_SCALAR;
 
@@ -55,7 +75,7 @@ public class ImageToAscii {
         return resizedImage;
     }
 
-    private String convert(BufferedImage image){
+    private static String convert(BufferedImage image){
         String output = "";
         for(int j = 0; j < image.getHeight(); j ++){
             for(int i = 0; i < image.getWidth(); i++){
