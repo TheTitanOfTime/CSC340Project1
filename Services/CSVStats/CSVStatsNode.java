@@ -63,7 +63,7 @@ public class CSVStatsNode  extends Node{
     }
 
     private static byte[] success(String result) {
-        String filename = "ascii.txt";
+        String filename = "CSVStats.csv";
         String escResult   = result.replace("\\", "\\\\").replace("\"", "\\\"");
         String escFilename = filename.replace("\\", "\\\\").replace("\"", "\\\"");
         return ("{\"status\":\"ok\",\"result\":\"" + escResult
@@ -78,7 +78,7 @@ public class CSVStatsNode  extends Node{
     }
 
     public static void main(String[] args) {
-        System.out.println("[ImageToAsciiNode] Starting...");
+        System.out.println("[CSV STATS Node] Starting...");
         new ImageToAsciiNode().run();
     }
     
