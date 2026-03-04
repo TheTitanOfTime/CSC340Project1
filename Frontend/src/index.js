@@ -6,12 +6,17 @@ window.onload = function() {
     console.log("establish connection to server");
     establishConnection();
     initDragAndDrop();
-}
 
-document.getElementById("uploadForm").addEventListener("submit", function(e) {
-    e.preventDefault();
-    uploadFile();
-});
+    document.getElementById("uploadForm").addEventListener("submit", function(e) {
+        e.preventDefault();
+        uploadFile();
+    });
+
+    document.getElementById("Upload_File").addEventListener('change', function() {
+        const label = document.querySelector('label[for="Upload_File"]');
+        if (this.files[0]) updateLabelText(label, this.files[0].name);
+    });
+}
 
 function establishConnection() {
     fetch(GATEWAY + '/ping')
@@ -43,6 +48,7 @@ function initDragAndDrop() {
         const file = e.dataTransfer.files[0];
         if (!file) return;
 
+        const dt = new DataTransfer();
         dt.items.add(file);
         document.getElementById("Upload_File").files = dt.files;
 
@@ -56,11 +62,6 @@ function updateLabelText(label, filename) {
         ? `<b>${filename}</b><br><span style="font-size:0.8em;opacity:0.7">Click or drag to change</span>`
         : 'Click or Drag <br> to Upload File';
 }
-
-document.getElementById("Upload_File").addEventListener('change', function() {
-    const label = document.querySelector('label[for="Upload_File"]');
-    if (this.files[0]) updateLabelText(label, this.files[0].name);
-});
 
 function uploadFile() {
     if (serviceNum == -1) {
@@ -79,9 +80,9 @@ function uploadFile() {
     reader.onload = function(event) {
         const base64Data = event.target.result.split(',')[1];
         const data = {
-            service:  serviceNum,   // 1-6
-            filename: file.name,    // doesn't matter
-            base64:   base64Data    // file data
+            service:  serviceNum,
+            filename: file.name,
+            base64:   base64Data
         };
         sendToServer(data);
     };
