@@ -100,7 +100,6 @@ public class ImageToAsciiService {
             }
             output += "\n";
         }
-        System.out.println(output);
         return output;
     }
 
