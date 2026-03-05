@@ -1,0 +1,91 @@
+
+header{
+    background-color: rgb(42 42 42);
+    color: rgb(149, 107, 201);
+    font-size:45px;
+    font-weight:bold;
+}
+body{
+    background-color:rgb(42 42 42);
+    color: beige;
+}
+
+.Upload_File_Form{
+    float: left;
+    padding-right:30px;
+}
+
+.Custom_File_Upload {
+    display:flex;
+    margin-left: 20px;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    margin-right: 10px;
+
+    width: 320px;
+    height: 320px;
+
+    background-color: rgb(53, 53, 53);
+    color: beige;
+    cursor: pointer;
+
+    border-radius: 6px;
+    border-color:rgb(100, 88, 109);
+    border-width:4px;
+    border-style:dashed;
+
+    justify-content: center;
+    align-items: center;
+    font-size: 16px;
+}
+
+.Custom_File_Upload:hover{
+    display: flex;
+    margin-left: 15px;
+    margin-top: 5px;
+    margin-bottom: 5px;
+    margin-right: 5px;
+
+    width: 330px;
+    height: 330px;
+
+    background-color: rgb(70, 70, 70);
+    color: beige;
+    cursor: pointer;
+
+
+    border-radius: 6px;
+    border-color:rgb(100, 88, 109);
+    border-width:4px;
+    border-style:dashed;
+
+    justify-content: center;
+    align-items: center;
+    font-size: 16px;
+}
+
+
+#Page_Title{
+    background-color: rgb(42 42 42);
+    color: rgb(149, 107, 201);
+}
+
+#Submit_Button{
+    background-color: rgb(70, 70, 70);
+    color: beige;
+
+    margin-left: 20px;
+    margin-top: 10px;
+    position:absolute;
+}
+
+#Instructions{
+    margin-left: 10px;
+    margin-top: 50px;
+}
+
+label.drag-over {
+    border-color: #9966cc;
+    background: rgba(153, 102, 204, 0.15);
+    transform: scale(1.02);
+}

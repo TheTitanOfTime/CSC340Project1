@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aunt Man Microservices — N-Body 3D Renderer</title>
+  <link rel="icon" type="image/png" href="../Resources/images/favicon.png">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    html, body { height: 100%; overflow: hidden; }
+
+    /* ── Canvas area fills the space below the site header ── */
+    #scene-wrap {
+      position: relative;
+      height: calc(100vh - 74px);
+      background: #020209;
+      overflow: hidden;
+    }
+
+    /* ── Input panel (left) ── */
+    #input-panel {
+      position: absolute;
+      top: 20px; left: 20px;
+      width: 300px;
+      background: rgba(5, 5, 25, 0.88);
+      border: 1px solid #2a3a6a;
+      border-radius: 10px;
+      padding: 16px;
+      z-index: 10;
+      backdrop-filter: blur(4px);
+      font-family: 'Courier New', monospace;
+      color: beige;
+    }
+
+    #input-panel h2 {
+      color: #7ab4ff;
+      font-size: 13px;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+    }
+
+    #json-input {
+      width: 100%;
+      height: 130px;
+      background: #080820;
+      color: #7fff7f;
+      border: 1px solid #2a3a6a;
+      border-radius: 5px;
+      padding: 8px;
+      font-size: 10px;
+      font-family: 'Courier New', monospace;
+      resize: vertical;
+    }
+    #json-input:focus { outline: none; border-color: #4a7aef; }
+
+    #render-btn {
+      margin-top: 8px;
+      width: 100%;
+      padding: 9px;
+      background: #1a2a6a;
+      color: #7ab4ff;
+      border: 1px solid #4a7aef;
+      border-radius: 5px;
+      cursor: pointer;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      letter-spacing: 1px;
+      transition: background 0.2s;
+    }
+    #render-btn:hover { background: #2a3a8a; }
+
+    #error-msg {
+      margin-top: 6px;
+      color: #ff7070;
+      font-size: 10px;
+      min-height: 14px;
+    }
+
+    /* ── Info panel (right) ── */
+    #info-panel {
+      position: absolute;
+      top: 20px; right: 20px;
+      width: 270px;
+      background: rgba(5, 5, 25, 0.88);
+      border: 1px solid #2a3a6a;
+      border-radius: 10px;
+      padding: 16px;
+      z-index: 10;
+      display: none;
+      backdrop-filter: blur(4px);
+      font-family: 'Courier New', monospace;
+      color: beige;
+    }
+
+    #info-panel h2 {
+      color: #7ab4ff;
+      font-size: 13px;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+
+    #meta {
+      font-size: 10px;
+      color: #8888aa;
+      margin-bottom: 10px;
+      line-height: 1.6;
+    }
+
+    .body-row {
+      margin: 5px 0;
+      padding: 7px 8px;
+      border-radius: 5px;
+      border-left: 3px solid;
+      background: rgba(255,255,255,0.04);
+    }
+    .body-name  { font-size: 12px; font-weight: bold; }
+    .body-stats { font-size: 9px; color: #9999bb; margin-top: 3px; line-height: 1.6; }
+
+    /* ── Bottom hint ── */
+    #status-bar {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #2a3a4a;
+      font-size: 10px;
+      font-family: 'Courier New', monospace;
+      letter-spacing: 0.5px;
+      z-index: 10;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    /* ── CSS2D body labels ── */
+    .body-label {
+      font-size: 11px;
+      font-family: 'Courier New', monospace;
+      background: rgba(0, 0, 0, 0.55);
+      padding: 2px 6px;
+      border-radius: 3px;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+
+<body>
+  <header id="Page_Title">
+    <a href="/" style="color:#9966cc;text-decoration:none;font-size:12px;margin-right:16px;font-family:'Courier New',monospace;">&#8592; Back</a>
+    <b>Aunt Man Microservices</b>
+  </header>
+  <hr>
+
+  <div id="scene-wrap">
+
+    <!-- Input panel -->
+    <div id="input-panel">
+      <h2>N-Body 3D Renderer</h2>
+      <textarea id="json-input" placeholder='Paste the JSON response from the N-body service node here.
+
+Example:
+{ "status": "ok", "steps_completed": 365,
+  "dt": 86400.0, "bodies": [ ... ] }
+
+Then click Render.'></textarea>
+      <button id="render-btn" onclick="renderFromInput()">&#9654;&nbsp; Render</button>
+      <div id="error-msg"></div>
+    </div>
+
+    <!-- Info panel -->
+    <div id="info-panel">
+      <h2>Final State</h2>
+      <div id="meta"></div>
+      <div id="body-list"></div>
+    </div>
+
+    <div id="status-bar">Drag to rotate &nbsp;&middot;&nbsp; Scroll to zoom &nbsp;&middot;&nbsp; Right-drag to pan</div>
+
+  </div><!-- /#scene-wrap -->
+
+  <!-- Three.js via import map -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three":         "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+  import * as THREE                        from 'three';
+  import { OrbitControls }                from 'three/addons/controls/OrbitControls.js';
+  import { CSS2DRenderer, CSS2DObject }   from 'three/addons/renderers/CSS2DRenderer.js';
+
+  const PALETTE = [
+    0xFFD700, 0x4FC3F7, 0xFF7043, 0xAB47BC, 0x66BB6A,
+    0xEF5350, 0x26C6DA, 0xFFEE58, 0xEC407A, 0x78909C,
+  ];
+
+  let scene, camera, webglRenderer, labelRenderer, controls;
+  let sceneObjects = [];   // {mesh|light, label?} per body
+
+  function initScene() {
+    const container = document.getElementById('scene-wrap');
+
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x020209);
+    scene.fog = new THREE.FogExp2(0x020209, 0.0005);
+
+    addStarfield();
+
+    camera = new THREE.PerspectiveCamera(55, container.offsetWidth / container.offsetHeight, 0.01, 200000);
+    camera.position.set(0, 120, 280);
+
+    webglRenderer = new THREE.WebGLRenderer({ antialias: true });
+    webglRenderer.setPixelRatio(window.devicePixelRatio);
+    webglRenderer.setSize(container.offsetWidth, container.offsetHeight);
+    container.appendChild(webglRenderer.domElement);
+
+    labelRenderer = new CSS2DRenderer();
+    labelRenderer.setSize(container.offsetWidth, container.offsetHeight);
+    labelRenderer.domElement.style.position     = 'absolute';
+    labelRenderer.domElement.style.top          = '0';
+    labelRenderer.domElement.style.pointerEvents = 'none';
+    container.appendChild(labelRenderer.domElement);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+    scene.add(new THREE.GridHelper(600, 30, 0x0a1a3a, 0x0a1a3a));
+    scene.add(new THREE.AxesHelper(25));
+
+    controls = new OrbitControls(camera, webglRenderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.07;
+    controls.minDistance   = 5;
+    controls.maxDistance   = 50000;
+
+    window.addEventListener('resize', () => {
+      camera.aspect = container.offsetWidth / container.offsetHeight;
+      camera.updateProjectionMatrix();
+      webglRenderer.setSize(container.offsetWidth, container.offsetHeight);
+      labelRenderer.setSize(container.offsetWidth, container.offsetHeight);
+    });
+
+    (function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      webglRenderer.render(scene, camera);
+      labelRenderer.render(scene, camera);
+    })();
+  }
+
+  function addStarfield() {
+    const pos = new Float32Array(4000 * 3);
+    for (let i = 0; i < pos.length; i++) pos[i] = (Math.random() - 0.5) * 8000;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    scene.add(new THREE.Points(geo,
+      new THREE.PointsMaterial({ color: 0xffffff, size: 0.6, sizeAttenuation: true })));
+  }
+
+  function clearBodies() {
+    sceneObjects.forEach(({ mesh, light, label }) => {
+      scene.remove(mesh);
+      if (light)  scene.remove(light);
+      if (label)  label.element.remove();
+    });
+    sceneObjects = [];
+  }
+
+  function massToRadius(mass, logMin, logMax) {
+    const t = (logMax === logMin) ? 0.5 : (Math.log10(mass) - logMin) / (logMax - logMin);
+    return 1.5 + t * 18;
+  }
+
+  function renderBodies(bodies) {
+    clearBodies();
+
+    let maxAbsCoord = 1e-10;
+    bodies.forEach(b => {
+      maxAbsCoord = Math.max(maxAbsCoord, Math.abs(b.x), Math.abs(b.y), Math.abs(b.z));
+    });
+    const SCALE = 150 / maxAbsCoord;
+
+    const logMasses = bodies.map(b => Math.log10(b.mass));
+    const logMin    = Math.min(...logMasses);
+    const logMax    = Math.max(...logMasses);
+
+    bodies.forEach((b, i) => {
+      const color  = new THREE.Color(PALETTE[i % PALETTE.length]);
+      const radius = massToRadius(b.mass, logMin, logMax);
+      // Physics XY = orbital plane → Three.js XZ
+      const pos    = new THREE.Vector3(b.x * SCALE, b.z * SCALE, -b.y * SCALE);
+
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(radius, 48, 48),
+        new THREE.MeshPhongMaterial({
+          color, emissive: color,
+          emissiveIntensity: i === 0 ? 0.55 : 0.12,
+          shininess: 80,
+        })
+      );
+      mesh.position.copy(pos);
+      scene.add(mesh);
+
+      let light = null;
+      if (i === 0) {
+        light = new THREE.PointLight(color, 3.5, 0, 1.5);
+        light.position.copy(pos);
+        scene.add(light);
+      }
+
+      const div = document.createElement('div');
+      div.className   = 'body-label';
+      div.textContent = `[${i + 1}]  ${b.mass.toExponential(2)} kg`;
+      div.style.color = '#' + color.getHexString();
+      const label = new CSS2DObject(div);
+      label.position.set(0, radius + 2.5, 0);
+      mesh.add(label);
+
+      sceneObjects.push({ mesh, light, label });
+    });
+
+    const camDist = maxAbsCoord * SCALE * 1.6;
+    camera.position.set(camDist * 0.4, camDist * 0.5, camDist);
+    controls.target.set(0, 0, 0);
+    controls.update();
+  }
+
+  function updateInfoPanel(data) {
+    document.getElementById('info-panel').style.display = 'block';
+    const days = (data.steps_completed * data.dt / 86400).toFixed(2);
+    document.getElementById('meta').innerHTML =
+      `Steps: <b>${data.steps_completed}</b> &nbsp;|&nbsp; dt: <b>${data.dt.toExponential(2)} s</b><br>` +
+      `Simulated: <b>${days} days</b>`;
+
+    const list = document.getElementById('body-list');
+    list.innerHTML = '';
+    data.bodies.forEach((b, i) => {
+      const hex = '#' + new THREE.Color(PALETTE[i % PALETTE.length]).getHexString();
+      const row = document.createElement('div');
+      row.className = 'body-row';
+      row.style.borderColor = hex;
+      row.innerHTML =
+        `<div class="body-name" style="color:${hex}">[${i+1}]  ${b.mass.toExponential(3)} kg</div>` +
+        `<div class="body-stats">x=${fmt(b.x)} &nbsp;y=${fmt(b.y)} &nbsp;z=${fmt(b.z)}<br>` +
+        `vx=${fmt(b.vx)} vy=${fmt(b.vy)} vz=${fmt(b.vz)}</div>`;
+      list.appendChild(row);
+    });
+  }
+
+  window.renderFromInput = function () {
+    const raw    = document.getElementById('json-input').value.trim();
+    const errDiv = document.getElementById('error-msg');
+    errDiv.textContent = '';
+
+    let data;
+    try { data = JSON.parse(raw); }
+    catch (e) { errDiv.textContent = 'JSON parse error: ' + e.message; return; }
+
+    if (data.status !== 'ok') {
+      errDiv.textContent = 'Service returned error: ' + (data.message || JSON.stringify(data));
+      return;
+    }
+    if (!data.bodies || data.bodies.length < 1) {
+      errDiv.textContent = 'No bodies found in the response JSON.';
+      return;
+    }
+
+    renderBodies(data.bodies);
+    updateInfoPanel(data);
+  };
+
+  const fmt = v => v.toExponential(2);
+
+  initScene();
+
+  // Auto-render if data was pre-injected
+  const _preload = document.getElementById('preload-data');
+  if (_preload && _preload.textContent.trim()) {
+    document.getElementById('json-input').value = _preload.textContent.trim();
+    setTimeout(renderFromInput, 300);
+  }
+  </script>
+</body>
+</html>

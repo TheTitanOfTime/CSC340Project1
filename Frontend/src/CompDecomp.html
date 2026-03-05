@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compression / Decompression — Aunt Man Microservices</title>
+    <link rel="icon" type="image/png" href="../Resources/images/favicon.png">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+
+<body>
+    <header id="Page_Title">
+        <a href="/" style="color:#9966cc;text-decoration:none;font-size:12px;margin-right:16px;font-family:'Courier New',monospace;">&#8592; Back</a>
+        <b>Compression / Decompression</b>
+    </header>
+    <hr>
+    <br>
+
+    <div class="Upload_File_Form">
+        <input type="file" id="Upload_File" hidden>
+        <label for="Upload_File" class="Custom_File_Upload" id="Upload_Label"> Click or Drag <br> to Upload File</label>
+
+        <div style="display:flex;gap:12px;justify-content:center;margin-top:12px;">
+            <input type="button" id="Compress_Button"   value="Compress"   class="action-btn">
+            <input type="button" id="Decompress_Button" value="Decompress" class="action-btn">
+        </div>
+    </div>
+
+    <div id="status" style="text-align:center;font-family:'Courier New',monospace;font-size:13px;color:#aaaacc;margin-top:16px;"></div>
+    <div id="result" style="text-align:center;margin-top:12px;"></div>
+
+    <div id="instructions">
+        <ol>
+            <li>Click or drag a file into the upload area to select it.</li>
+            <li>Click <b>Compress</b> to compress the file — downloads as <code>filename.zip</code>.</li>
+            <li>Click <b>Decompress</b> to decompress a previously compressed <code>.zip</code> file.</li>
+        </ol>
+    </div>
+
+    <script>
+        const fileInput      = document.getElementById('Upload_File');
+        const uploadLabel    = document.getElementById('Upload_Label');
+        const statusDiv      = document.getElementById('status');
+        const resultDiv      = document.getElementById('result');
+        const compressBtn    = document.getElementById('Compress_Button');
+        const decompressBtn  = document.getElementById('Decompress_Button');
+
+        // Update label text when a file is chosen
+        fileInput.addEventListener('change', () => {
+            const name = fileInput.files[0] ? fileInput.files[0].name : null;
+            uploadLabel.innerHTML = name
+                ? name
+                : 'Click or Drag <br> to Upload File';
+            statusDiv.textContent = '';
+            resultDiv.innerHTML   = '';
+        });
+
+        compressBtn.addEventListener('click',   () => run('compress'));
+        decompressBtn.addEventListener('click', () => run('decompress'));
+
+        async function run(operation) {
+            const file = fileInput.files[0];
+            if (!file) {
+                statusDiv.textContent = 'Please select a file first.';
+                return;
+            }
+
+            statusDiv.textContent = operation === 'compress'
+                ? 'Compressing...'
+                : 'Decompressing...';
+            resultDiv.innerHTML = '';
+
+            let base64data;
+            try {
+                base64data = await readFileAsBase64(file);
+            } catch (e) {
+                statusDiv.textContent = 'Failed to read file: ' + e.message;
+                return;
+            }
+
+            const payload = JSON.stringify({
+                service:   3,
+                operation: operation,
+                filename:  file.name,
+                data:      base64data
+            });
+
+            let response;
+            try {
+                const res = await fetch('/api/compress', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    payload
+                });
+                if (!res.ok) {
+                    const text = await res.text();
+                    statusDiv.textContent = 'Server error (' + res.status + '): ensure the server is running the latest build.';
+                    console.error(text);
+                    return;
+                }
+                response = await res.json();
+            } catch (e) {
+                if (e instanceof TypeError) {
+                    statusDiv.textContent =
+                        'Network error: could not reach the server. ' +
+                        'Make sure the server is running and open this page via http://localhost:5050/CompDecomp.html';
+                } else {
+                    statusDiv.textContent = 'Unexpected error: ' + e.message;
+                }
+                return;
+            }
+
+            if (response.status === 'ok') {
+                const outputBytes = base64ToUint8Array(response.result);
+                const blob        = new Blob([outputBytes], { type: 'application/octet-stream' });
+                const url         = URL.createObjectURL(blob);
+                const outName     = response.filename || file.name;
+
+                statusDiv.textContent = operation === 'compress'
+                    ? 'Compression complete!'
+                    : 'Decompression complete!';
+
+                resultDiv.innerHTML =
+                    '<a href="' + url + '" download="' + outName + '" ' +
+                    'style="color:#9966cc;font-family:\'Courier New\',monospace;font-size:13px;">' +
+                    'Download ' + outName + '</a>';
+            } else {
+                statusDiv.textContent = 'Error: ' + (response.message || 'Unknown error');
+            }
+        }
+
+        // Reads a File as a Base64 string (no data-URL prefix)
+        function readFileAsBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload  = e => {
+                    const bytes  = new Uint8Array(e.target.result);
+                    resolve(uint8ArrayToBase64(bytes));
+                };
+                reader.onerror = () => reject(reader.error);
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        function uint8ArrayToBase64(bytes) {
+            let binary = '';
+            for (let i = 0; i < bytes.byteLength; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return btoa(binary);
+        }
+
+        function base64ToUint8Array(b64) {
+            const binary = atob(b64);
+            const bytes  = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return bytes;
+        }
+    </script>
+
+</body>
+
+</html>
