@@ -79,7 +79,7 @@ public class CSVStatsNode  extends Node{
 
     public static void main(String[] args) {
         System.out.println("[CSV STATS Node] Starting...");
-        new ImageToAsciiNode().run();
+        new CSVStatsNode().run();
     }
     
 
