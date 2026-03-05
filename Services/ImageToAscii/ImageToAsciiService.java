@@ -16,16 +16,14 @@ public class ImageToAsciiService {
 
     public static byte[] convert_to_ascii(byte[] bytes){
         BufferedImage image = btyes_to_bufferedImage(bytes);
-        
         String txt_file = "";   
 
         image = grayscale_conversion(image);
         image = resize(image);
-
         txt_file = convert(image);
+        
         byte[] file_bytes = txt_file.getBytes(StandardCharsets.UTF_8);
-
-        return file_bytes;
+        return Base64.getEncoder().encode(file_bytes);
     }
 
 
