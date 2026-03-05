@@ -60,13 +60,11 @@ public class CSVStatsService {
 
 
     public static ArrayList<ArrayList<String>> UTF_to_CSV_list(byte[] file_bytes){
-        String base64 = new String(file_bytes, StandardCharsets.US_ASCII);
-        byte[] decoded_bytes = Base64.getDecoder().decode(base64);
+        byte[] decoded_bytes = Base64.getDecoder().decode(file_bytes);
         String csv_text = new String(decoded_bytes, StandardCharsets.UTF_8);
-
+    
         ArrayList<ArrayList<String>> data = new ArrayList<>();
-
-        //line reader code from https://codingtechroom.com/question/read-string-line-by-line-java
+    
         try {
             BufferedReader reader = new BufferedReader(new StringReader(csv_text));
                 String line;
