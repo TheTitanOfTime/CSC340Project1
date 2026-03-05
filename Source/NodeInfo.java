@@ -4,7 +4,7 @@ import java.time.Duration;
 import java.time.Instant;
 
 public class NodeInfo {
-    public static final long DEAD_THRESHOLD_MS = 120_000;
+    public static final long DEAD_THRESHOLD_MS = 60_000;
 
     private final int nodeId;
     private final String ip;
