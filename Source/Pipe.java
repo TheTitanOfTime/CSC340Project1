@@ -125,10 +125,10 @@ public class Pipe implements Runnable {
 
         } catch (IOException e) {
             System.err.printf("[Pipe-%d] IO error: %s%n", clientId, e.getMessage());
+        } finally {
+            System.out.printf("[Pipe-%d] Done.%n", clientId);
+            releaseId.run();
         }
-
-        System.out.printf("[Pipe-%d] Done.%n", clientId);
-        releaseId.run();
     }
 
     // ------------------------------------------------------------------ //
