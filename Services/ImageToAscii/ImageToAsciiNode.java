@@ -23,27 +23,17 @@ public class ImageToAsciiNode  extends Node{
     @Override
     protected byte[] handleRequest(byte[] payload) {
         String json = new String(payload, StandardCharsets.UTF_8);
-
         String base64Data = extractJsonString(json, "base64");
-
         if (base64Data == null) {
             return error("Missing \"base64\" field.");
         }
 
-        byte[] imageBytes;
-         
-        try {
-            imageBytes = Base64.getDecoder().decode(base64Data);
-        } catch (IllegalArgumentException e) {
-            return error("Invalid Base64 input in \"data\" field: " + e.getMessage());
-        }
-        
-        byte[] asciiBytes = ImageToAsciiService.convert_to_ascii(imageBytes);
+        // Pass the raw Base64 bytes directly — let ImageToAsciiService do the decoding
+        byte[] asciiBytes = ImageToAsciiService.convert_to_ascii(base64Data.getBytes(StandardCharsets.UTF_8));
         String asciiResult = new String(asciiBytes, StandardCharsets.UTF_8);
-
         return success(asciiResult);
-
     }
+    
 
     private static String extractJsonString(String json, String key) {
         String needle = "\"" + key + "\":\"";

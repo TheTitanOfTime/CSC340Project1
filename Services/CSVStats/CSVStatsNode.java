@@ -32,15 +32,7 @@ public class CSVStatsNode  extends Node{
             return error("Missing \"base64\" field.");
         }
 
-        byte[] csv_bytes;
-         
-        try {
-            csv_bytes = Base64.getDecoder().decode(base64Data);
-        } catch (IllegalArgumentException e) {
-            return error("Invalid Base64 input in \"data\" field: " + e.getMessage());
-        }
-        
-        byte[] csv_output = CSVStatsService.get_csv_stats(csv_bytes);
+        byte[] csv_output = CSVStatsService.get_csv_stats(base64Data.getBytes(StandardCharsets.UTF_8));
         String asciiResult = new String(csv_output, StandardCharsets.UTF_8);
 
         return success(asciiResult);
