@@ -62,21 +62,30 @@ public class Pipe implements Runnable {
             OutputStream clientOut = cs.getOutputStream();
 
             // ---------------------------------------------------------- //
-            // Step 1 — read the full JSON payload from the client         //
+            // Step 1 — send available services back to the client         //
+            // Client can read this list before deciding what to send.     //
+            // ---------------------------------------------------------- //
+            String availableServices = buildServiceList();
+            clientOut.write((availableServices + "\n").getBytes());
+            clientOut.flush();
+
+            // ---------------------------------------------------------- //
+            // Step 2 — read the full JSON payload from the client         //
             // Expected format:                                             //
             //   { "service": <1-5>, "filename": "...", "base64": "..." }  //
             // Client ID is assigned by the server on connection.          //
             // ---------------------------------------------------------- //
             byte[] payload = clientIn.readAllBytes();
             if (payload.length == 0) {
-                sendError(clientOut, "Empty request.");
+                // Client connected only to retrieve the service list — close cleanly.
+                System.out.printf("[Pipe-%d] Status-only connection, closing.%n", clientId);
                 return;
             }
 
             String json = new String(payload);
 
             // ---------------------------------------------------------- //
-            // Step 2 — extract service number and map to Service enum     //
+            // Step 3 — extract service number and map to Service enum     //
             // ---------------------------------------------------------- //
             int serviceNum = extractServiceNumber(json);
             if (serviceNum < 1) {
@@ -92,13 +101,6 @@ public class Pipe implements Runnable {
 
             System.out.printf("[Pipe-%d] Routing service number %d -> %s%n",
                     clientId, serviceNum, requested);
-
-            // ---------------------------------------------------------- //
-            // Step 3 — send available services back to the client         //
-            // ---------------------------------------------------------- //
-            String availableServices = buildServiceList();
-            clientOut.write((availableServices + "\n").getBytes());
-            clientOut.flush();
 
             // ---------------------------------------------------------- //
             // Step 4 — find a live node for the requested service         //

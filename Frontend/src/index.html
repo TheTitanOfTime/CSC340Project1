@@ -52,6 +52,8 @@
             color: #7ab4ff;
         }
         .tag.placeholder { color: #888; border-color: #555; }
+        .tag.online  { color: #4caf50; border-color: #4caf50; }
+        .tag.offline { color: #f44336; border-color: #f44336; }
         #page-subtitle {
             padding: 10px 20px 0 20px;
             font-size: 13px;
@@ -105,5 +107,48 @@
         </a>
 
     </div>
+
+    <script>
+        const serviceNumToCardId = {
+            1: "Gravitational_Stepper",
+            2: "Base64",
+            3: "Comp_Decomp",
+            4: "CSV_Stats",
+            5: "Image-ASCII"
+        };
+
+        function pollStatus() {
+            fetch('/api/status')
+                .then(r => r.json())
+                .then(data => {
+                    // Reset all to offline
+                    for (const [num, cardId] of Object.entries(serviceNumToCardId)) {
+                        const card = document.getElementById(cardId);
+                        if (!card) continue;
+                        const tag = card.querySelector('.tag');
+                        if (!tag) continue;
+                        tag.textContent = `Service ${num} — Offline`;
+                        tag.className = 'tag offline';
+                    }
+                    // Mark online services
+                    for (const svc of data.services) {
+                        const cardId = serviceNumToCardId[svc.serviceNum];
+                        if (!cardId) continue;
+                        const card = document.getElementById(cardId);
+                        if (!card) continue;
+                        const tag = card.querySelector('.tag');
+                        if (!tag) continue;
+                        tag.textContent = `Service ${svc.serviceNum} — Online`;
+                        tag.className = 'tag online';
+                    }
+                })
+                .catch(() => {});
+        }
+
+        window.onload = function() {
+            pollStatus();
+            setInterval(pollStatus, 5000);
+        };
+    </script>
 </body>
 </html>
