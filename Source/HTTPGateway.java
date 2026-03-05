@@ -16,18 +16,19 @@ import java.util.concurrent.Executors;
  * Listens on HTTP_PORT (5000) and proxies to DoormanListener on TCP 5101.
  *
  * Endpoints:
- *   GET  /ping       → { "status": "alive" }
- *   POST /api/nbody  → proxies JSON body through the full Pipe → NBodyNode
- *                       pipeline and returns the service result JSON.
+ *   GET  /ping          → { "status": "alive" }
+ *   GET  /api/status    → { "services": [ { "name": "...", "serviceNum": N } ] }
+ *   POST /api/service   → proxies JSON body through Pipe to the appropriate SN
+ *   GET  /*             → static files from FRONTEND_DIR
  *
- * CORS headers are sent on every response so the browser can call this
- * from any local file or live-server origin.
+ * All service requests use /api/service regardless of which service is targeted.
+ * The JSON payload must contain "service": N so Pipe can route to the right node.
  *
  * TCP protocol followed (matches Pipe.java exactly):
  *   1. Connect to DoormanListener on TCP 5101.
- *   2. Write the JSON payload.
- *   3. Call shutdownOutput() — signals EOF; Pipe's readAllBytes() returns.
- *   4. Read the AVAILABLE_SERVICES line (terminated with '\n') — discarded.
+ *   2. Read the AVAILABLE_SERVICES line (terminated with '\n') — discarded.
+ *   3. Write the JSON payload.
+ *   4. Call shutdownOutput() — signals EOF; Pipe's readAllBytes() returns.
  *   5. Read remaining bytes — the service node result JSON.
  *   6. Return result as the HTTP response body.
  */
@@ -56,8 +57,6 @@ public class HTTPGateway implements Runnable {
             HttpServer server = HttpServer.create(
                     new InetSocketAddress(HTTP_PORT), /* backlog */ 32);
             server.createContext("/ping",         this::handlePing);
-            server.createContext("/api/nbody",    this::handleNBody);
-            server.createContext("/api/compress", this::handleCompress);
             server.createContext("/api/service",  this::handleService);
             server.createContext("/api/status",   this::handleStatus);
             server.createContext("/",             this::handleStatic);
@@ -84,90 +83,6 @@ public class HTTPGateway implements Runnable {
     }
 
     // -----------------------------------------------------------------------
-    // POST /api/nbody
-    // -----------------------------------------------------------------------
-
-    private void handleNBody(HttpExchange ex) throws IOException {
-        addCors(ex);
-
-        // Browser sends a preflight OPTIONS before the real POST
-        if ("OPTIONS".equalsIgnoreCase(ex.getRequestMethod())) {
-            ex.sendResponseHeaders(204, -1);
-            return;
-        }
-
-        byte[] payload = ex.getRequestBody().readAllBytes();
-        if (payload.length == 0) {
-            sendError(ex, "Empty request body.");
-            return;
-        }
-
-        // ── Proxy through the full TCP pipeline ──────────────────────────
-        try (Socket socket = new Socket(DOORMAN_HOST, DOORMAN_PORT)) {
-
-            // Step 2: send JSON payload
-            OutputStream out = socket.getOutputStream();
-            out.write(payload);
-            out.flush();
-
-            // Step 3: signal EOF so Pipe's readAllBytes() returns
-            socket.shutdownOutput();
-
-            InputStream in = socket.getInputStream();
-
-            // Step 4: skip the AVAILABLE_SERVICES line
-            readLine(in);
-
-            // Step 5: read the service result
-            byte[] result = in.readAllBytes();
-
-            ex.getResponseHeaders().set("Content-Type", "application/json");
-            ex.sendResponseHeaders(200, result.length);
-            try (OutputStream os = ex.getResponseBody()) { os.write(result); }
-
-        } catch (IOException e) {
-            sendError(ex, "Could not reach DoormanListener: " + e.getMessage());
-        }
-    }
-
-    // -----------------------------------------------------------------------
-    // POST /api/compress
-    // -----------------------------------------------------------------------
-
-    private void handleCompress(HttpExchange ex) throws IOException {
-        addCors(ex);
-
-        if ("OPTIONS".equalsIgnoreCase(ex.getRequestMethod())) {
-            ex.sendResponseHeaders(204, -1);
-            return;
-        }
-
-        byte[] payload = ex.getRequestBody().readAllBytes();
-        if (payload.length == 0) {
-            sendError(ex, "Empty request body.");
-            return;
-        }
-
-        try (Socket socket = new Socket(DOORMAN_HOST, DOORMAN_PORT)) {
-            OutputStream out = socket.getOutputStream();
-            out.write(payload);
-            out.flush();
-            socket.shutdownOutput();
-
-            InputStream in = socket.getInputStream();
-            readLine(in); // skip AVAILABLE_SERVICES line
-            byte[] result = in.readAllBytes();
-
-            ex.getResponseHeaders().set("Content-Type", "application/json");
-            ex.sendResponseHeaders(200, result.length);
-            try (OutputStream os = ex.getResponseBody()) { os.write(result); }
-
-        } catch (IOException e) {
-            sendError(ex, "Could not reach DoormanListener: " + e.getMessage());
-        }
-    }
-
-    // -----------------------------------------------------------------------
     // POST /api/service  — generic proxy for all other services
     // -----------------------------------------------------------------------
 
@@ -179,25 +94,21 @@ public class HTTPGateway implements Runnable {
             return;
         }
 
-        byte[] payload = ex.getRequestBody().readAllBytes();
-        if (payload.length == 0) {
-            sendError(ex, "Empty request body.");
-            return;
-        }
-
         try (Socket socket = new Socket(DOORMAN_HOST, DOORMAN_PORT)) {
-            OutputStream out = socket.getOutputStream();
-            out.write(payload);
-            out.flush();
-            socket.shutdownOutput();
+            InputStream  tcpIn  = socket.getInputStream();
+            OutputStream tcpOut = socket.getOutputStream();
 
-            InputStream in = socket.getInputStream();
-            readLine(in); // skip AVAILABLE_SERVICES line
-            byte[] result = in.readAllBytes();
+            // Step 1: read AVAILABLE_SERVICES line Pipe sends immediately on connect
+            readLine(tcpIn);
 
+            // Step 2: stream HTTP request body → TCP (no in-memory buffering)
+            ex.getRequestBody().transferTo(tcpOut);
+            socket.shutdownOutput(); // signal EOF so Pipe's readAllBytes() returns
+
+            // Step 3: stream TCP response → HTTP response (chunked, no size needed)
             ex.getResponseHeaders().set("Content-Type", "application/json");
-            ex.sendResponseHeaders(200, result.length);
-            try (OutputStream os = ex.getResponseBody()) { os.write(result); }
+            ex.sendResponseHeaders(200, 0);
+            try (OutputStream os = ex.getResponseBody()) { tcpIn.transferTo(os); }
 
         } catch (IOException e) {
             sendError(ex, "Could not reach DoormanListener: " + e.getMessage());
