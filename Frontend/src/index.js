@@ -6,7 +6,7 @@ const serviceMap = {
 
 const currentPage = window.location.pathname.split("/").pop();
 const serviceNum = serviceMap[currentPage] ?? -1;
-const GATEWAY = "https://54.225.145.40:5001";
+const GATEWAY = "http://54.225.145.40:5050";
 
 window.onload = function() {
     console.log("establish connection to server");
@@ -112,7 +112,7 @@ function uploadFile() {
 }
 
 function sendToServer(data) {
-    fetch(GATEWAY, {
+    fetch(GATEWAY + "/api/service", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),

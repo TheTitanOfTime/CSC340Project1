@@ -58,6 +58,7 @@ public class HTTPGateway implements Runnable {
             server.createContext("/ping",         this::handlePing);
             server.createContext("/api/nbody",    this::handleNBody);
             server.createContext("/api/compress", this::handleCompress);
+            server.createContext("/api/service",  this::handleService);
             server.createContext("/",             this::handleStatic);
             server.setExecutor(Executors.newCachedThreadPool());
             server.start();
@@ -133,6 +134,43 @@ public class HTTPGateway implements Runnable {
     // -----------------------------------------------------------------------
 
     private void handleCompress(HttpExchange ex) throws IOException {
+        addCors(ex);
+
+        if ("OPTIONS".equalsIgnoreCase(ex.getRequestMethod())) {
+            ex.sendResponseHeaders(204, -1);
+            return;
+        }
+
+        byte[] payload = ex.getRequestBody().readAllBytes();
+        if (payload.length == 0) {
+            sendError(ex, "Empty request body.");
+            return;
+        }
+
+        try (Socket socket = new Socket(DOORMAN_HOST, DOORMAN_PORT)) {
+            OutputStream out = socket.getOutputStream();
+            out.write(payload);
+            out.flush();
+            socket.shutdownOutput();
+
+            InputStream in = socket.getInputStream();
+            readLine(in); // skip AVAILABLE_SERVICES line
+            byte[] result = in.readAllBytes();
+
+            ex.getResponseHeaders().set("Content-Type", "application/json");
+            ex.sendResponseHeaders(200, result.length);
+            try (OutputStream os = ex.getResponseBody()) { os.write(result); }
+
+        } catch (IOException e) {
+            sendError(ex, "Could not reach DoormanListener: " + e.getMessage());
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // POST /api/service  — generic proxy for all other services
+    // -----------------------------------------------------------------------
+
+    private void handleService(HttpExchange ex) throws IOException {
         addCors(ex);
 
         if ("OPTIONS".equalsIgnoreCase(ex.getRequestMethod())) {
