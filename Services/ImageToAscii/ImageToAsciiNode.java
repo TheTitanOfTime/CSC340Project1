@@ -30,14 +30,6 @@ public class ImageToAsciiNode  extends Node{
             return error("Missing \"base64\" field.");
         }
 
-        byte[] imageBytes;
-         
-        try {
-            imageBytes = Base64.getDecoder().decode(base64Data);
-        } catch (IllegalArgumentException e) {
-            return error("Invalid Base64 input in \"data\" field: " + e.getMessage());
-        }
-        
         byte[] asciiBytes = ImageToAsciiService.convert_to_ascii(imageBytes);
         String asciiResult = new String(asciiBytes, StandardCharsets.UTF_8);
 
