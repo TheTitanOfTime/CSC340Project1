@@ -22,7 +22,7 @@
         <form id="uploadForm">
 
             <input type="file" id="Upload_File" hidden>
-            <label for="Upload_File" class="Custom_File_Upload"> Click or Drag <br> to Upload File</label>
+            <label for="Upload_File" class="Custom_File_Upload"> Click or Drag <br>to upload Image</label>
 
             <input type="submit" id="Submit_Button" value="Upload File">
         </form>
@@ -31,11 +31,14 @@
         <img id="Image_Preview" src="" alt="" style="display:none; max-width:100px; margin-top:16px; border-radius:8px;">
     </div>
 
+    <div id="status" style="text-align:center;font-family:'Courier New',monospace;font-size:13px;color:#aaaacc;margin-top:16px;"></div>
+    <div id="result" style="text-align:center;margin-top:12px;"></div>
+
     <div id="instructions">
         <ol>
-            <li>Upload the file you want converted to ASCII</li>
-            <li>Click upload file button</li>
-            <li>do something to get it back</li>
+            <li>Upload the file you want converted to ASCII.</li>
+            <li>Click <b>Upload File</b> — the result will download automatically as a <code>.txt</code> file.</li>
+            <li>A download link will also appear on the page if you need it again.</li>
         </ol>
     </div>
 

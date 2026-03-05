@@ -1,5 +1,7 @@
 const serviceMap = {
+    "Gravitational.html": 1,
     "Base64.html": 2,
+    "CompDecomp.html": 3,
     "CSVStats.html": 4,
     "Image-ASCII.html": 5,
 };
