@@ -677,7 +677,7 @@
     msg.className   = 'busy';
 
     try {
-      const resp = await fetch(GATEWAY + '/api/nbody', {
+      const resp = await fetch(GATEWAY + '/api/service', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload,
       });
       const data = await resp.json();

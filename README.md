@@ -97,7 +97,7 @@ Each node sends a UDP heartbeat to the server every 5 seconds. Once registered, 
 
 Open **http://localhost:5050** in a browser. Service cards show **Online** (green) or **Offline** (red) based on live heartbeat status, updated every 10 seconds.
 
-> **Local testing only:** Change the `GATEWAY` constant in `Frontend/src/index.js` from the AWS IP to `http://localhost:5050` before testing locally, then revert before deploying.
+> **Note:** All frontend API calls use relative URLs (`/api/service`, etc.), so the same build works both locally and on AWS without any changes.
 
 ---
 
