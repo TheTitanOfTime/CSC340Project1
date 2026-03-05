@@ -1,5 +1,7 @@
 const serviceMap = {
+    "Gravitational.html": 1,
     "Base64.html": 2,
+    "CompDecomp.html": 3,
     "CSVStats.html": 4,
     "Image-ASCII.html": 5,
 };
@@ -111,19 +113,89 @@ function uploadFile() {
     reader.readAsDataURL(file);
 }
 
+function setResult(html) {
+    const el = document.getElementById('result');
+    if (el) el.innerHTML = html;
+}
+
 function sendToServer(data) {
+
+    setStatus('Uploading…');
+    setResult('');
+    
     fetch(GATEWAY + "/api/service", {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) throw new Error(`Server error (${response.status})`);
+        return response.json();
+    })
     .then(responseData => {
         console.log('Server response:', responseData);
+        handleResponse(responseData, data.filename);
     })
     .catch(error => {
         console.error('Error sending file:', error);
+        if (error instanceof TypeError) {
+            setStatus('Network error: could not reach the server. Make sure the server is running.');
+        } else {
+            setStatus('Error: ' + error.message);
+        }
     });
+}
+
+function handleResponse(responseData, originalFilename) {
+    if (responseData.status !== 'ok') {
+        setStatus('Error: ' + (responseData.message || 'Unknown error from server.'));
+        return;
+    }
+
+    // Service 4 — CSV Stats: server returns a base64-encoded CSV
+    if (serviceNum === 4) {
+        const outName = responseData.filename || originalFilename.replace(/\.csv$/i, '_stats.csv');
+        const bytes   = base64ToUint8Array(responseData.result);
+        const blob    = new Blob([bytes], { type: 'text/csv' });
+        const url     = URL.createObjectURL(blob);
+
+        // Auto-trigger download
+        const a = document.createElement('a');
+        a.href = url; a.download = outName; a.click();
+
+        setStatus('Done! Stats file ready.');
+        setResult(
+            `<a href="${url}" download="${outName}" ` +
+            `style="color:#9966cc;font-family:'Courier New',monospace;font-size:13px;">` +
+            `Download ${outName}</a>`
+        );
+    }
+
+    // Service 5 — Image to ASCII: server returns a base64-encoded .txt file
+    else if (serviceNum === 5) {
+        const outName = responseData.filename || originalFilename.replace(/\.(png|jpe?g)$/i, '_ascii.txt');
+        const bytes   = base64ToUint8Array(responseData.result);
+        const blob    = new Blob([bytes], { type: 'text/plain' });
+        const url     = URL.createObjectURL(blob);
+
+        // Auto-trigger download
+        const a = document.createElement('a');
+        a.href = url; a.download = outName; a.click();
+
+        setStatus('Done! ASCII file ready.');
+        setResult(
+            `<a href="${url}" download="${outName}" ` +
+            `style="color:#9966cc;font-family:'Courier New',monospace;font-size:13px;">` +
+            `Download ${outName}</a>`
+        );
+    }
+}
+
+function base64ToUint8Array(b64) {
+    const binary = atob(b64);
+    const bytes  = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
 }
     
 function showPreview(file) {
