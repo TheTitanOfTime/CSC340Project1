@@ -59,6 +59,7 @@ public class HTTPGateway implements Runnable {
             server.createContext("/api/nbody",    this::handleNBody);
             server.createContext("/api/compress", this::handleCompress);
             server.createContext("/api/service",  this::handleService);
+            server.createContext("/api/status",   this::handleStatus);
             server.createContext("/",             this::handleStatic);
             server.setExecutor(Executors.newCachedThreadPool());
             server.start();
@@ -201,6 +202,69 @@ public class HTTPGateway implements Runnable {
         } catch (IOException e) {
             sendError(ex, "Could not reach DoormanListener: " + e.getMessage());
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // GET /api/status — live service list via TCP pipeline
+    // -----------------------------------------------------------------------
+
+    /**
+     * Opens a TCP connection to DoormanListener, reads the AVAILABLE_SERVICES
+     * line that Pipe sends immediately on connect, then closes without sending
+     * a payload (Pipe sees empty bytes and exits cleanly).
+     *
+     * Returns JSON: { "services": [ { "name": "...", "serviceNum": N }, ... ] }
+     */
+    private void handleStatus(HttpExchange ex) throws IOException {
+        addCors(ex);
+        if ("OPTIONS".equalsIgnoreCase(ex.getRequestMethod())) {
+            ex.sendResponseHeaders(204, -1);
+            return;
+        }
+
+        try (Socket socket = new Socket(DOORMAN_HOST, DOORMAN_PORT)) {
+            String line = readLine(socket.getInputStream());
+            // line format: "AVAILABLE_SERVICES:NAME1,NAME2,..."
+
+            StringBuilder sb = new StringBuilder("{\"services\":[");
+            String prefix = "AVAILABLE_SERVICES:";
+            if (line.startsWith(prefix)) {
+                String list = line.substring(prefix.length());
+                if (!list.isEmpty()) {
+                    String[] names = list.split(",");
+                    boolean first = true;
+                    for (String name : names) {
+                        name = name.trim();
+                        if (name.isEmpty()) continue;
+                        int num = serviceNumber(name);
+                        if (!first) sb.append(",");
+                        sb.append("{\"name\":\"").append(name)
+                          .append("\",\"serviceNum\":").append(num).append("}");
+                        first = false;
+                    }
+                }
+            }
+            sb.append("]}");
+
+            byte[] body = sb.toString().getBytes(StandardCharsets.UTF_8);
+            ex.getResponseHeaders().set("Content-Type", "application/json");
+            ex.sendResponseHeaders(200, body.length);
+            try (OutputStream os = ex.getResponseBody()) { os.write(body); }
+
+        } catch (IOException e) {
+            sendError(ex, "Could not reach DoormanListener: " + e.getMessage());
+        }
+    }
+
+    private static int serviceNumber(String name) {
+        return switch (name) {
+            case "N_BODY_GRAVITATIONAL_STEPPER" -> 1;
+            case "BASE64_ENCODE_DECODE"         -> 2;
+            case "COMPRESSION_DECOMPRESSION"    -> 3;
+            case "CSV_STATS"                    -> 4;
+            case "IMAGE_TO_ASCII"               -> 5;
+            default                             -> -1;
+        };
     }
 
     // -----------------------------------------------------------------------
