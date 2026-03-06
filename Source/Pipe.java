@@ -70,19 +70,18 @@ public class Pipe implements Runnable {
             clientOut.flush();
 
             // ---------------------------------------------------------- //
-            // Step 2 — read the full JSON payload from the client         //
-            // Expected format:                                             //
-            //   { "service": <1-5>, "filename": "...", "base64": "..." }  //
-            // Client ID is assigned by the server on connection.          //
+            // Step 2 — read just enough of the payload to extract the     //
+            // service number, without buffering the full (potentially     //
+            // large) base64 body into heap.                               //
             // ---------------------------------------------------------- //
-            byte[] payload = clientIn.readAllBytes();
-            if (payload.length == 0) {
+            byte[] header = clientIn.readNBytes(4096);
+            if (header.length == 0) {
                 // Client connected only to retrieve the service list — close cleanly.
                 System.out.printf("[Pipe-%d] Status-only connection, closing.%n", clientId);
                 return;
             }
 
-            String json = new String(payload);
+            String json = new String(header);
 
             // ---------------------------------------------------------- //
             // Step 3 — extract service number and map to Service enum     //
@@ -115,7 +114,7 @@ public class Pipe implements Runnable {
             // Step 5 — forward full JSON payload to SN, stream result back//
             // ---------------------------------------------------------- //
             try {
-                forwardToNode(targetNode, payload, clientOut);
+                forwardToNode(targetNode, header, clientIn, clientOut);
             } catch (IOException e) {
                 System.err.printf("[Pipe-%d] forwardToNode error: %s%n", clientId, e.getMessage());
                 String msg = e.getMessage() != null ? e.getMessage().replace("\"", "'") : "Node unreachable";
@@ -166,11 +165,12 @@ public class Pipe implements Runnable {
     }
 
     /**
-     * Opens a TCP connection to the Service Node, sends the full JSON payload,
-     * signals EOF, then copies all response bytes back to the client.
+     * Opens a TCP connection to the Service Node, streams the full JSON payload
+     * (header bytes already read + remaining client stream), signals EOF, then
+     * streams the response back to the client — no full buffering in either direction.
      */
-    private void forwardToNode(NodeInfo node, byte[] payload, OutputStream clientOut)
-            throws IOException {
+    private void forwardToNode(NodeInfo node, byte[] header, InputStream clientIn,
+                               OutputStream clientOut) throws IOException {
 
         System.out.printf("[Pipe-%d] Forwarding to node %d at %s:%d%n",
                 clientId, node.getNodeId(), node.getIp(), node.getTcpPort());
@@ -179,16 +179,17 @@ public class Pipe implements Runnable {
             OutputStream nodeOut = nodeSocket.getOutputStream();
             InputStream  nodeIn  = nodeSocket.getInputStream();
 
-            nodeOut.write(payload);
-            nodeOut.flush();
+            // Write the already-buffered header, then stream the rest directly.
+            nodeOut.write(header);
+            clientIn.transferTo(nodeOut);
             nodeSocket.shutdownOutput(); // signal EOF to SN
 
-            byte[] result = nodeIn.readAllBytes();
-            clientOut.write(result);
+            // Stream response back without buffering.
+            long bytes = nodeIn.transferTo(clientOut);
             clientOut.flush();
 
             System.out.printf("[Pipe-%d] Forwarded %d result bytes back to client.%n",
-                    clientId, result.length);
+                    clientId, bytes);
         }
     }
 
