@@ -187,7 +187,9 @@ function handleResponse(responseData, originalFilename) {
     // For Base64 decode, the result is base64-encoded original bytes — decode back to binary.
     const blobData = (serviceNum === 2 && document.querySelector('input[name="b64op"]:checked')?.value === 'decode')
         ? base64ToUint8Array(responseData.result)
-        : responseData.result;
+        : (serviceNum === 4)
+            ? base64ToUint8Array(responseData.result)
+            : responseData.result;
     const blob = new Blob([blobData], { type: mimeType });
     const url  = URL.createObjectURL(blob);
 
