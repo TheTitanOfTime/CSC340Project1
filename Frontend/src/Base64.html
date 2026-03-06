@@ -21,6 +21,15 @@
     <div class="Upload_File_Form">
         <form id="uploadForm">
 
+            <div style="display:flex;justify-content:center;gap:24px;margin-bottom:16px;font-family:'Courier New',monospace;font-size:13px;">
+                <label style="cursor:pointer;">
+                    <input type="radio" name="b64op" id="op_encode" value="encode" checked> Encode
+                </label>
+                <label style="cursor:pointer;">
+                    <input type="radio" name="b64op" id="op_decode" value="decode"> Decode
+                </label>
+            </div>
+
             <input type="file" id="Upload_File" hidden>
             <label for="Upload_File" class="Custom_File_Upload"> Click or Drag <br> to Upload File</label>
 
@@ -28,11 +37,14 @@
         </form>
     </div>
 
+    <div id="status" style="text-align:center;font-family:'Courier New',monospace;font-size:13px;color:#aaaacc;margin-top:16px;"></div>
+    <div id="result" style="text-align:center;margin-top:12px;"></div>
+
     <div id="instructions">
         <ol>
-            <li>instruction 1</li>
-            <li>instruction 2</li>
-            <li>instruction 3</li>
+            <li>Select <b>Encode</b> to convert any file to a Base64 <code>.b64</code> text file, or <b>Decode</b> to convert a <code>.b64</code> file back to its original form.</li>
+            <li>Upload your file using the area above, then click <b>Upload File</b>.</li>
+            <li>The result will download automatically.</li>
         </ol>
     </div>
 

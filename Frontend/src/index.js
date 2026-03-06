@@ -8,7 +8,7 @@ const serviceMap = {
 
 const currentPage = window.location.pathname.split("/").pop();
 const serviceNum = serviceMap[currentPage] ?? -1;
-const GATEWAY = "http://54.225.145.40:5050";
+const GATEWAY = "";
 
 window.onload = function() {
     console.log("establish connection to server");
@@ -103,14 +103,21 @@ function uploadFile() {
     const reader = new FileReader();
     reader.onload = function(event) {
         const base64Data = event.target.result.split(',')[1];
-        const data = {
-            service:  serviceNum,
-            filename: file.name,
-            base64:   base64Data
-        };
+        let data;
+        if (serviceNum === 2) {
+            const op = document.querySelector('input[name="b64op"]:checked')?.value || 'encode';
+            data = { service: 2, operation: op, filename: file.name, data: base64Data };
+        } else {
+            data = { service: serviceNum, filename: file.name, base64: base64Data };
+        }
         sendToServer(data);
     };
     reader.readAsDataURL(file);
+}
+
+function setStatus(text) {
+    const el = document.getElementById('status');
+    if (el) el.textContent = text;
 }
 
 function setResult(html) {
@@ -152,43 +159,47 @@ function handleResponse(responseData, originalFilename) {
         return;
     }
 
-    // Service 4 — CSV Stats: server returns a base64-encoded CSV
-    if (serviceNum === 4) {
-        const outName = responseData.filename || originalFilename.replace(/\.csv$/i, '_stats.csv');
-        const bytes   = base64ToUint8Array(responseData.result);
-        const blob    = new Blob([bytes], { type: 'text/csv' });
-        const url     = URL.createObjectURL(blob);
+    let outName, mimeType, statusMsg;
 
-        // Auto-trigger download
-        const a = document.createElement('a');
-        a.href = url; a.download = outName; a.click();
-
-        setStatus('Done! Stats file ready.');
-        setResult(
-            `<a href="${url}" download="${outName}" ` +
-            `style="color:#9966cc;font-family:'Courier New',monospace;font-size:13px;">` +
-            `Download ${outName}</a>`
-        );
+    if (serviceNum === 2) {
+        const op = document.querySelector('input[name="b64op"]:checked')?.value || 'encode';
+        if (op === 'decode') {
+            outName   = originalFilename.replace(/\.b64$/i, '') || originalFilename + '.decoded';
+            mimeType  = 'application/octet-stream';
+            statusMsg = 'Done! Decoded file ready.';
+        } else {
+            outName   = originalFilename + '.b64';
+            mimeType  = 'text/plain';
+            statusMsg = 'Done! Encoded file ready.';
+        }
+    } else if (serviceNum === 4) {
+        outName    = responseData.filename || originalFilename.replace(/\.csv$/i, '_stats.csv');
+        mimeType   = 'text/csv';
+        statusMsg  = 'Done! Stats file ready.';
+    } else if (serviceNum === 5) {
+        outName    = responseData.filename || originalFilename.replace(/\.(png|jpe?g)$/i, '_ascii.txt');
+        mimeType   = 'text/plain';
+        statusMsg  = 'Done! ASCII file ready.';
+    } else {
+        return;
     }
 
-    // Service 5 — Image to ASCII: server returns a base64-encoded .txt file
-    else if (serviceNum === 5) {
-        const outName = responseData.filename || originalFilename.replace(/\.(png|jpe?g)$/i, '_ascii.txt');
-        const bytes   = base64ToUint8Array(responseData.result);
-        const blob    = new Blob([bytes], { type: 'text/plain' });
-        const url     = URL.createObjectURL(blob);
+    // For Base64 decode, the result is base64-encoded original bytes — decode back to binary.
+    const blobData = (serviceNum === 2 && document.querySelector('input[name="b64op"]:checked')?.value === 'decode')
+        ? base64ToUint8Array(responseData.result)
+        : responseData.result;
+    const blob = new Blob([blobData], { type: mimeType });
+    const url  = URL.createObjectURL(blob);
 
-        // Auto-trigger download
-        const a = document.createElement('a');
-        a.href = url; a.download = outName; a.click();
+    const a = document.createElement('a');
+    a.href = url; a.download = outName; a.click();
 
-        setStatus('Done! ASCII file ready.');
-        setResult(
-            `<a href="${url}" download="${outName}" ` +
-            `style="color:#9966cc;font-family:'Courier New',monospace;font-size:13px;">` +
-            `Download ${outName}</a>`
-        );
-    }
+    setStatus(statusMsg);
+    setResult(
+        `<a href="${url}" download="${outName}" ` +
+        `style="color:#9966cc;font-family:'Courier New',monospace;font-size:13px;">` +
+        `Download ${outName}</a>`
+    );
 }
 
 function base64ToUint8Array(b64) {

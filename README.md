@@ -67,23 +67,24 @@ The frontend is now accessible at **http://localhost:5050**
 
 ### Step 3 — Start Service Nodes (one terminal each)
 
-Run whichever services you want available:
+On AWS each node runs on its own host and all use the default port 5102.
+When running locally, pass a unique `-Dservice.port` to each so they don't conflict:
 
 ```bash
 # Terminal 2
 java -cp out Services.NBody.NBodyNode
 
 # Terminal 3
-java -cp out Services.Base64.Base64Node
+java -cp out -Dservice.port=5103 Services.Base64.Base64Node
 
 # Terminal 4
-java -cp out Services.Compression.CompressionNode
+java -cp out -Dservice.port=5104 Services.Compression.CompressionNode
 
 # Terminal 5
-java -cp out Services.CSVStats.CSVStatsNode
+java -cp out -Dservice.port=5105 Services.CSVStats.CSVStatsNode
 
 # Terminal 6
-java -cp out Services.ImageToAscii.ImageToAsciiNode
+java -cp out -Dservice.port=5106 Services.ImageToAscii.ImageToAsciiNode
 ```
 
 Each node sends a UDP heartbeat to the server every 5 seconds. Once registered, it appears as **Online** on the home page within 10 seconds.
