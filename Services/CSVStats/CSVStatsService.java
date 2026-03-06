@@ -11,23 +11,27 @@ public class CSVStatsService {
         ArrayList<ArrayList<String>> output_file = find_stats(input_file);
         String output_string = create_csv_string(output_file);
         byte[] file_bytes = output_string.getBytes(StandardCharsets.UTF_8);
-        return file_bytes;
+        return Base64.getEncoder().encode(file_bytes);  
     }
 
 
     private static ArrayList<ArrayList<String>> find_stats(ArrayList<ArrayList<String>> data) {
         ArrayList<ArrayList<String>> results = new ArrayList<>();
-
+        ArrayList<ArrayList<String>> output = new ArrayList<>();
+        ArrayList<String> column_titles = new ArrayList();
+        
+        System.out.println("\n\n\n\n" + data.size() + ":  is the number of columns, is that right?\n\n\n\n\n");
         // Iterate over each column
-        for (int column = 0; column < data.size(); column++) {
-            String title = data.get(column).get(0); // Header is at row 0
+        for (int column = 0; column < data.get(0).size(); column++) {
+            System.out.println("inside the loop");
 
             // Try to parse all non-header rows as doubles
             ArrayList<Double> col = new ArrayList<>();
             boolean is_numeric = true;
 
-            for (int row = 1; row < data.get(column).size(); row++) {
-                String cell = data.get(column).get(row).trim();
+            for (int row = 1; row < data.size(); row++) {
+                System.out.println("inside the second loop");
+                String cell = data.get(row).get(column).trim();
                 try {
                     col.add(Double.parseDouble(cell));
                 } catch (NumberFormatException e) {
@@ -41,10 +45,10 @@ public class CSVStatsService {
             // Sort a copy for median (doesn't affect mode/other calcs)
             ArrayList<Double> sorted = new ArrayList<>(col);
             Collections.sort(sorted);
+            column_titles.add(data.get(0).get(column));
 
             // Build the result column: [label, mean, median, mode, std, min, max]
             ArrayList<String> stat_column = new ArrayList<>();
-            stat_column.add(title);
             stat_column.add(String.valueOf(mean(col)));
             stat_column.add(String.valueOf(median(sorted)));  // pass sorted copy
             stat_column.add(String.valueOf(mode(col)));
@@ -55,7 +59,21 @@ public class CSVStatsService {
             results.add(stat_column);
         }
 
-        return results;
+        
+        output = transpose(results);
+        for(int i = 1; i < output.get(0).size(); i++){
+            output.get(0).set(i, column_titles.get(i-1));
+        }
+
+        output.get(1).set(0, "mean");
+        output.get(2).set(0, "median");
+        output.get(3).set(0, "mode");
+        output.get(4).set(0, "standard deviation");
+        output.get(5).set(0, "min");
+        output.get(6).set(0, "max");
+
+
+        return output;
     }
 
 
@@ -114,6 +132,37 @@ public class CSVStatsService {
         result.add(value);
 
         return result;   
+    }
+
+
+    public static ArrayList<ArrayList<String>> transpose(ArrayList<ArrayList<String>> input) {
+        ArrayList<ArrayList<String>> result = new ArrayList<>();
+
+        if (input == null || input.isEmpty()) {
+            return result;
+        }
+
+        int numRows = input.size();
+        int numCols = input.get(0).size();
+
+        // Add blank row at index 0 (length = numRows + 1 to account for blank col at index 0)
+        ArrayList<String> blankRow = new ArrayList<>();
+        for (int i = 0; i <= numRows; i++) {
+            blankRow.add("");
+        }
+        result.add(blankRow);
+
+        for (int col = 0; col < numCols; col++) {
+            ArrayList<String> newRow = new ArrayList<>();
+            // Add blank cell at column 0
+            newRow.add("");
+            for (int row = 0; row < numRows; row++) {
+                newRow.add(input.get(row).get(col));
+            }
+            result.add(newRow);
+        }
+
+        return result;
     }
 
 
