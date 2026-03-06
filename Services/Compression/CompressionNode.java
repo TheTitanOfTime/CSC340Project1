@@ -84,6 +84,11 @@ public class CompressionNode extends Node {
             return error("Invalid Base64 input in \"data\" field: " + e.getMessage());
         }
 
+        final int MAX_BYTES = 30 * 1024 * 1024; // 30 MB
+        if (inputBytes.length > MAX_BYTES) {
+            return error("File exceeds the 30 MB maximum upload size.");
+        }
+
         return switch (operation.trim().toLowerCase()) {
             case "compress" -> {
                 try {

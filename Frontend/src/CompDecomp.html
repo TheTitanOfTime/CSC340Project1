@@ -47,14 +47,21 @@
         const compressBtn    = document.getElementById('Compress_Button');
         const decompressBtn  = document.getElementById('Decompress_Button');
 
+        const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30 MB
+
         // Update label text when a file is chosen
         fileInput.addEventListener('change', () => {
-            const name = fileInput.files[0] ? fileInput.files[0].name : null;
+            const file = fileInput.files[0];
+            const name = file ? file.name : null;
             uploadLabel.innerHTML = name
                 ? name
                 : 'Click or Drag <br> to Upload File';
-            statusDiv.textContent = '';
-            resultDiv.innerHTML   = '';
+            resultDiv.innerHTML = '';
+            if (file && file.size > MAX_FILE_SIZE) {
+                statusDiv.textContent = 'File too large. Maximum upload size is 30 MB.';
+            } else {
+                statusDiv.textContent = '';
+            }
         });
 
         compressBtn.addEventListener('click',   () => run('compress'));
@@ -64,6 +71,10 @@
             const file = fileInput.files[0];
             if (!file) {
                 statusDiv.textContent = 'Please select a file first.';
+                return;
+            }
+            if (file.size > MAX_FILE_SIZE) {
+                statusDiv.textContent = 'File too large. Maximum upload size is 30 MB.';
                 return;
             }
 
