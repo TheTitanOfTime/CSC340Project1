@@ -45,8 +45,10 @@ public abstract class Node implements Runnable {
     // Constants
     // -----------------------------------------------------------------------
 
-    /** All nodes bind to this TCP port — each runs on its own host/container. */
-    public static final int SERVICE_PORT = 5102;
+    /** All nodes bind to this TCP port — each runs on its own host/container.
+     *  Override for local multi-node testing: -Dservice.port=5103 */
+    public static final int SERVICE_PORT =
+            Integer.parseInt(System.getProperty("service.port", "5102"));
 
     /** How often (ms) this node sends a UDP heartbeat to the server. */
     private static final int HEARTBEAT_INTERVAL_MS = 5_000;

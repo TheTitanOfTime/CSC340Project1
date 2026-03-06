@@ -52,7 +52,7 @@ public class ImageToAsciiNode  extends Node{
 
     private static byte[] success(String result) {
         String filename = "ascii.txt";
-        String escResult   = result.replace("\\", "\\\\").replace("\"", "\\\"");
+        String escResult   = result.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
         String escFilename = filename.replace("\\", "\\\\").replace("\"", "\\\"");
         return ("{\"status\":\"ok\",\"result\":\"" + escResult
                 + "\",\"filename\":\"" + escFilename + "\"}")

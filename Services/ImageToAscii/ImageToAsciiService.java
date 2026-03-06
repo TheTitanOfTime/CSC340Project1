@@ -23,7 +23,7 @@ public class ImageToAsciiService {
         txt_file = convert(image);
         
         byte[] file_bytes = txt_file.getBytes(StandardCharsets.UTF_8);
-        return Base64.getEncoder().encode(file_bytes);
+        return file_bytes;
     }
 
 
