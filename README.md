@@ -53,8 +53,8 @@ javac -d out Source/*.java
 javac -cp out -d out Services/Base64/*.java
 javac -cp out -d out Services/NBody/*.java
 javac -cp out -d out Services/Compression/*.java
-javac -cp out -d out Services/CSVStats/*.java
 javac -cp out -d out Services/ImageToAscii/*.java
+javac -cp out -d out Services/CSVStats/*.java
 ```
 
 ### Step 2 — Start the Server (Terminal 1)
@@ -113,7 +113,11 @@ Open **http://localhost:5050** in a browser. Service cards show **Online** (gree
    ```
 3. Client sends JSON payload and signals EOF (closes write end):
    ```json
-   { "service": 2, "filename": "file.txt", "base64": "<base64-encoded data>" }
+   { "service": 4, "filename": "data.csv", "base64": "<base64-encoded file>" }
+   ```
+   For Base64 Encode/Decode (service 2), the payload uses `data` and `operation` instead:
+   ```json
+   { "service": 2, "operation": "encode", "filename": "file.txt", "data": "<base64-encoded file>" }
    ```
 4. Server routes to the appropriate live SN, forwards payload
 5. SN processes and responds — server streams result back to client
@@ -134,6 +138,120 @@ The server marks a node **dead** if no heartbeat is received for **60 seconds**.
 ### Server → Service Node (TCP :5102)
 
 The Pipe thread connects to the SN, forwards the full JSON payload, signals EOF, then reads all response bytes and streams them back to the original client.
+
+---
+
+## Service Reference
+
+### Service 1 — N-Body Gravitational Stepper
+
+Simulates gravitational interaction between N bodies over a given number of time steps using Euler integration.
+
+**Node:** `NBodyNode` (Pattern A) — `NODE_ID = 1`
+
+**Request payload:**
+
+```json
+{
+  "service": 1,
+  "dt":      0.01,
+  "steps":   100,
+  "bodies": [
+    { "mass": 1e30, "x": 0, "y": 0, "z": 0, "vx": 0, "vy": 0, "vz": 0 },
+    { "mass": 5e24, "x": 1.5e11, "y": 0, "z": 0, "vx": 0, "vy": 29783, "vz": 0 }
+  ]
+}
+```
+
+**Response:**
+
+```json
+{ "status": "ok", "steps_completed": 100, "dt": 0.01, "bodies": [ … ] }
+```
+
+---
+
+### Service 2 — Base64 Encode / Decode
+
+Encodes any file to a Base64 text file (`.b64`) or decodes a `.b64` file back to its original form.
+
+**Node:** `Base64Node` (Pattern A) — `NODE_ID = 2`
+
+**Request payload:**
+
+```json
+{ "service": 2, "operation": "encode", "filename": "photo.png", "data": "<base64-encoded file>" }
+{ "service": 2, "operation": "decode", "filename": "photo.png.b64", "data": "<base64-encoded file>" }
+```
+
+**Response:**
+
+```json
+{ "status": "ok", "result": "<base64 string>" }
+```
+> The `data` field is always base64 (the browser's `readAsDataURL` encoding). For decode, the node unwraps two layers: the browser wrapper and the `.b64` file content.
+
+---
+
+### Service 3 — Compression / Decompression
+
+Compresses any file using Java's Deflate algorithm (ZIP format), or decompresses a previously compressed file.
+
+**Node:** `CompressionNode` (Pattern A) — `NODE_ID = 3`
+
+**Request payload:**
+
+```json
+{ "service": 3, "operation": "compress",   "filename": "notes.txt",     "data": "<base64-encoded file>" }
+{ "service": 3, "operation": "decompress", "filename": "notes.txt.zip", "data": "<base64-encoded file>" }
+```
+
+**Response:**
+
+```json
+{ "status": "ok", "result": "<base64-encoded output bytes>", "filename": "notes.txt.zip" }
+```
+> Result is base64-encoded binary — the frontend must decode it with `base64ToUint8Array` before creating a Blob.
+
+---
+
+### Service 4 — CSV Stats
+
+Computes per-column descriptive statistics (mean, median, mode, standard deviation, min, max) for all numeric columns in a CSV file.
+
+**Node:** `CSVStatsNode` (Pattern A) — `NODE_ID = 4`
+
+**Request payload:**
+
+```json
+{ "service": 4, "filename": "data.csv", "base64": "<base64-encoded CSV file>" }
+```
+
+**Response:**
+
+```json
+{ "status": "ok", "result": "<CSV text of statistics>", "filename": "CSVStats.csv" }
+```
+
+---
+
+### Service 5 — Image to ASCII
+
+Converts a PNG or JPEG image to an ASCII art text file by grayscaling, resizing, and mapping pixel brightness to ASCII characters.
+
+**Node:** `ImageToAsciiNode` (Pattern A) — `NODE_ID = 5`
+
+**Request payload:**
+
+```json
+{ "service": 5, "filename": "photo.png", "base64": "<base64-encoded image>" }
+```
+
+**Response:**
+
+```json
+{ "status": "ok", "result": "<ASCII art text>", "filename": "ascii.txt" }
+```
 
 ---
 
