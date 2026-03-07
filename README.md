@@ -199,6 +199,8 @@ Compresses any file using Java's Deflate algorithm (ZIP format), or decompresses
 
 **Node:** `CompressionNode` (Pattern A) — `NODE_ID = 3`
 
+> **File size limit:** Maximum 30 MB. Larger files will be rejected by the frontend before upload.
+
 **Request payload:**
 
 ```json
@@ -211,6 +213,7 @@ Compresses any file using Java's Deflate algorithm (ZIP format), or decompresses
 ```json
 { "status": "ok", "result": "<base64-encoded output bytes>", "filename": "notes.txt.zip" }
 ```
+
 > Result is base64-encoded binary — the frontend must decode it with `base64ToUint8Array` before creating a Blob.
 
 ---
@@ -285,12 +288,41 @@ Subclasses implement one of two patterns:
 
 The live server is at **http://54.225.145.40:5050**
 
-Each component runs as a systemd service on its own EC2 instance. To override the frontend directory or server host at launch:
+Each component runs as a systemd service on its own EC2 instance.
+
+### Build & Deploy
+
+A build script on the server watches for changes on `master`, compiles all sources into a JAR, distributes it to every node via `scp`, and restarts all systemd services:
+
+```bash
+# Compile all sources into /home/ec2-user/Artifact/
+javac -d /home/ec2-user/Artifact Source/*.java
+javac -d /home/ec2-user/Artifact Services/NBody/*.java
+javac -d /home/ec2-user/Artifact Services/Base64/*.java
+javac -d /home/ec2-user/Artifact Services/Compression/*.java
+javac -d /home/ec2-user/Artifact Services/CSVStats/*.java
+javac -d /home/ec2-user/Artifact Services/ImageToAscii/*.java
+
+# Package into a single JAR
+jar cvf MicroService.jar \
+    Source/*.class \
+    Services/NBody/*.class \
+    Services/Base64/*.class \
+    Services/Compression/*.class \
+    Services/CSVStats/*.class \
+    Services/ImageToAscii/*.class
+
+# Distribute to all nodes and restart
+scp MicroService.jar ec2-user@<node-ip>:/home/ec2-user
+ssh ec2-user@<node-ip> "sudo systemctl restart microservice"
+```
+
+### Runtime flags
 
 ```bash
 # Server
-java -cp microservices.jar -Dfrontend.dir=/home/ec2-user/Frontend Source.Server
+java -cp /home/ec2-user/MicroService.jar -Dfrontend.dir=/home/ec2-user/Frontend Source.Server
 
 # Service node pointing to server's private IP
-java -cp microservices.jar -Dserver.host=10.0.x.x Services.Base64.Base64Node
+java -cp /home/ec2-user/MicroService.jar -Dserver.host=10.0.x.x Services.Base64.Base64Node
 ```
